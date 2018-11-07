@@ -1,0 +1,80 @@
+name:                robonomics-tools
+version:             0.1.0.0
+github:              "airalab/robonomics-tools"
+license:             BSD3
+author:              "Alexander Krupenkin"
+maintainer:          "akru@aira.life"
+copyright:           "(c) Airalab"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+synopsis:            Tool set for working with Robonomics network
+category:            Network
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/airalab/robonomics-tools#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- optparse-applicative
+- concurrent-machines
+- base58-bytestring
+- secp256k1-haskell
+- monad-control 
+- monad-logger
+- data-default
+- generics-sop
+- bytestring
+- cryptonite
+- containers
+- exceptions
+- microlens
+- machines
+- hashable
+- process
+- memory
+- aeson
+- async
+- text
+- web3
+- mtl
+
+library:
+  source-dirs: src
+
+executables:
+  liability:
+    main:                Main.hs
+    source-dirs:         app/liability
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - robonomics-tools
+
+  xrtd:
+    main:                Main.hs
+    source-dirs:         app/xrtd
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - robonomics-tools
+
+tests:
+  robonomics-tools-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - robonomics-tools
