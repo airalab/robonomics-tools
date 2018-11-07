@@ -1,0 +1,11 @@
+sudo: false 
+language: nix 
+
+# Caching so the next build will be fast too.
+cache:
+  directories:
+  - $HOME/.stack
+  - $TRAVIS_BUILD_DIR/.stack-work
+
+script:
+- nix-shell -p stack --run "stack build --nix"
