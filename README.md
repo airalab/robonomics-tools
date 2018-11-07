@@ -11,6 +11,8 @@ Using [Stackage](https://docs.haskellstack.org/en/stable/README/) with [Nix](htt
     git clone https://github.com/airalab/robonomics-tools && cd robonomics-tools
     stack build --nix
 
+* [Ubuntu install guide](https://github.com/airalab/robonomics-tools/tree/master/docs/ubuntu_install_guide.md)
+
 Usage
 -----
 
@@ -50,12 +52,18 @@ Examples
 
 * `xrtd` on Ethereum mainnet 
 
+```
     stack exec xrtd -- --private "40c0901dbcb03e43df4e3ec432f15168ec390f3d861227d12e115c06c9d8f1ca"
+```
 
 > If you want to give more quota for your provider, please visit [Lighthouse manager Dapp]().
 
 * `xrtd` on cliquebait testnet
 
+```
     stack exec xrtd -- --private "40c0901dbcb03e43df4e3ec432f15168ec390f3d861227d12e115c06c9d8f1ca" --web3 http://localhost:8545 --ens "0x3c6d5ee6c4d9067a3c58906f3689534aa30de02b" --chain 420123
+```
+
+---
 
 **Have fun!**
