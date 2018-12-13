@@ -106,7 +106,4 @@ finalize :: JsonRpc m
          -> PrivateKeyAccount m TxReceipt
 finalize lighthouse Report{..} =
     withParam (to .~ lighthouse) $
-        Lighthouse.to reportLiability $
-            selector (Proxy :: Proxy L.FinalizeData) <> encode finalize
-  where
-    finalize = L.FinalizeData reportResult reportSuccess reportSignature True
+        Lighthouse.finalizeLiability reportLiability reportResult reportSuccess reportSignature

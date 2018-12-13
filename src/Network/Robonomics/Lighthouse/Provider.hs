@@ -119,23 +119,15 @@ ipfs Config{..} = do
             $logInfo $ "Lighthouse found, name: " <> T.pack lighthouseName <> ", address: " <> T.pack (show lighthouseAddress)
 
             let web3Safe = flip catchAll ($logError . T.pack . show) . void . web3
-
-            web3Safe $ withParam (to .~ lighthouseAddress) $ do
-                balance <- Lighthouse.balances accountAddress
-                minBalance <- Lighthouse.minimalFreeze
-                when (balance < minBalance) $ do
-                    xrt <- Lighthouse.xrt
-                    withParam (to .~ xrt) $
-                        XRT.approve lighthouseAddress minBalance
-                    void $ Lighthouse.refill minBalance
-
             liftIO $ async $ runStderrLoggingT $ do
-                Right xrt <- runWeb3' web3Provider $ withAccount web3Account $
-                        withParam (to .~ lighthouseAddress) Lighthouse.xrt
+                let xrtName = "xrt" ++ drop 11 (dropWhile (/= '.') lighthouseName)
+                Right xrtAddress <- runWeb3' web3Provider $
+                    withAccount web3Account $
+                        resolve ens $ C8.pack xrtName
                 forever $ do
                     Right (xrt, eth) <- runWeb3' web3Provider $ do
                         balanceEth <- Eth.getBalance accountAddress Latest
-                        balance <- withAccount web3Account $ withParam (to .~ xrt) $
+                        balance <- withAccount web3Account $ withParam (to .~ xrtAddress) $
                             XRT.balanceOf accountAddress
                         return (fromIntegral balance / 10^9, fromWei balanceEth)
 

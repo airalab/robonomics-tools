@@ -8,4 +8,4 @@ module Network.Robonomics.Contract.Liability where
 
 import           Network.Ethereum.Contract.TH
 
-[abiFrom|abi/RobotLiabilityLib.json|]
+[abiFrom|abi/ILiability.json|]
