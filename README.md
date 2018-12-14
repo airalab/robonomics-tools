@@ -56,7 +56,7 @@ Examples
     stack exec xrtd -- --private "40c0901dbcb03e43df4e3ec432f15168ec390f3d861227d12e115c06c9d8f1ca"
 ```
 
-> If you want to give more quota for your provider, please visit [Lighthouse manager Dapp](https://dev.aira.life/net3).
+> If you want to give more quota for your provider, please visit [Lighthouse manager Dapp](https://dev.aira.life/net).
 
 * `xrtd` on cliquebait testnet
 
