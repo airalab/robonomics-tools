@@ -13,10 +13,9 @@ module Network.Robonomics.Message
   , Report(..)
   ) where
 
-import           Crypto.Ethereum          (ecsign)
+import           Crypto.Ethereum          (PrivateKey, signMessage)
 import           Crypto.Hash              (Digest, Keccak_256)
 import qualified Crypto.Hash              as Crypto
-import           Crypto.Secp256k1         (CompactRecSig (..), SecKey)
 import           Data.Aeson               (FromJSON (..), ToJSON (..),
                                            withObject, (.:))
 import qualified Data.ByteArray           as BA (convert, drop)
@@ -47,9 +46,9 @@ instance (KnownNat n, n <= 256) => ToJSON (UIntN n) where
 class RobonomicsMsg a where
     hash :: a -> Digest Keccak_256
 
-    sign :: SecKey -> a -> Bytes
+    sign :: PrivateKey -> a -> Bytes
     {-# INLINE sign #-}
-    sign key = sigToBytes . ecsign key . hash
+    sign key = signMessage key . hash
 
 data Demand = Demand
     { demandModel        :: !Bytes
@@ -60,7 +59,8 @@ data Demand = Demand
     , demandValidator    :: !Address
     , demandValidatorFee :: !(UIntN 256)
     , demandDeadline     :: !(UIntN 256)
-    , demandNonce        :: !(BytesN 32)
+    , demandNonce        :: !(UIntN 256)
+    , demandSender       :: !Address
     , demandSignature    :: !Bytes
     }
   deriving (Eq, GHC.Generic)
@@ -75,7 +75,8 @@ instance Show Demand where
             , C8.pack (show demandLighthouse)
             , C8.pack (show demandValidator)
             , C8.pack (show demandValidatorFee)
-            , C8.pack (show (BA.convert demandNonce :: HexString))
+            , C8.pack (show demandNonce)
+            , C8.pack (show demandSender)
             , C8.pack (show (BA.convert demandSignature :: HexString))
             ]
 
@@ -93,7 +94,8 @@ instance FromJSON Demand where
         <*> v .: "validator"
         <*> v .: "validatorFee"
         <*> v .: "deadline"
-        <*> ((unsafeSizedByteArray :: Bytes -> BytesN 32) <$> (b16decode =<< v .: "nonce"))
+        <*> pure 0
+        <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
 data Offer = Offer
@@ -105,7 +107,8 @@ data Offer = Offer
     , offerLighthouse    :: !Address
     , offerLighthouseFee :: !(UIntN 256)
     , offerDeadline      :: !(UIntN 256)
-    , offerNonce         :: !(BytesN 32)
+    , offerNonce         :: !(UIntN 256)
+    , offerSender        :: !Address
     , offerSignature     :: !Bytes
     }
   deriving (Eq, GHC.Generic)
@@ -120,7 +123,8 @@ instance Show Offer where
             , C8.pack (show offerValidator)
             , C8.pack (show offerLighthouse)
             , C8.pack (show offerLighthouseFee)
-            , C8.pack (show (BA.convert offerNonce :: HexString))
+            , C8.pack (show offerNonce)
+            , C8.pack (show offerSender)
             , C8.pack (show (BA.convert offerSignature :: HexString))
             ]
 
@@ -138,7 +142,8 @@ instance FromJSON Offer where
         <*> v .: "lighthouse"
         <*> v .: "lighthouseFee"
         <*> v .: "deadline"
-        <*> ((unsafeSizedByteArray :: Bytes -> BytesN 32) <$> (b16decode =<< v .: "nonce"))
+        <*> pure 0
+        <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
 data Report = Report
@@ -180,6 +185,7 @@ demandHash Demand{..} =
                <> encode demandValidatorFee
                <> encode demandDeadline
                <> encode demandNonce
+               <> encode demandSender
 
 offerHash :: Offer -> Digest Keccak_256
 {-# INLINE offerHash #-}
@@ -193,6 +199,7 @@ offerHash Offer{..} =
                <> encode offerLighthouseFee
                <> encode offerDeadline
                <> encode offerNonce
+               <> encode offerSender
 
 reportHash :: Report -> Digest Keccak_256
 {-# INLINE reportHash #-}
@@ -211,6 +218,3 @@ b16decode = toError . convertFromBase Base16 . encodeUtf8
 toError :: Monad m => Either String a -> m a
 {-# INLINE toError #-}
 toError = either fail return
-
-sigToBytes :: CompactRecSig -> Bytes
-sigToBytes (CompactRecSig r s v) = BA.convert $ foldMap Short.fromShort [r, s, Short.pack [v]]

@@ -53,7 +53,7 @@ instance Show Liability where
 read :: JsonRpc m
      => Address
      -- ^ Liability address
-     -> PrivateKeyAccount m Liability
+     -> LocalKeyAccount m Liability
 read a = withParam (to .~ a) $
     Liability <$> L.model
               <*> L.objective
@@ -92,7 +92,7 @@ create :: JsonRpc m
        -- ^ Lighthouse address
        -> (Demand, Offer)
        -- ^ Matched deal
-       -> PrivateKeyAccount m TxReceipt
+       -> LocalKeyAccount m TxReceipt
 create lighthouse (demand, offer) =
     withParam (to .~ lighthouse) $
         F.createLiability (encode' demand) (encode' offer)
@@ -103,7 +103,7 @@ finalize :: JsonRpc m
          -- ^ Lighthouse address
          -> Report
          -- ^ Liability report
-         -> PrivateKeyAccount m TxReceipt
+         -> LocalKeyAccount m TxReceipt
 finalize lighthouse Report{..} =
     withParam (to .~ lighthouse) $
         Lighthouse.finalizeLiability reportLiability reportResult reportSuccess reportSignature

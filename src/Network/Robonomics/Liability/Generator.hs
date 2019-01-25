@@ -3,7 +3,8 @@
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
-module Network.Robonomics.Liability.Generator
+module Network.Robonomics.Liability.Generator where
+{-
     (
       randomDeal
     , randomReport
@@ -17,8 +18,9 @@ import           Control.Monad.IO.Class                 (MonadIO (..))
 import           Control.Monad.Logger                   (MonadLogger, logDebug,
                                                          logInfo)
 import           Control.Monad.Trans                    (lift)
+import           Crypto.Ethereum                        (PrivateKey,
+                                                         derivePubKey)
 import           Crypto.Random                          (MonadRandom (..))
-import           Crypto.Secp256k1                       (SecKey)
 import qualified Data.ByteArray                         as BA
 import           Data.ByteArray.HexString               (HexString)
 import           Data.ByteArray.Sized                   (unsafeFromByteArrayAccess)
@@ -26,6 +28,7 @@ import           Data.Default                           (def)
 import           Data.Either                            (rights)
 import           Data.Monoid                            (mempty)
 import           Data.Solidity.Event                    (decodeEvent)
+import           Data.Solidity.Prim.Address             (fromPubKey)
 import qualified Data.Text                              as T
 import qualified Network.Ethereum.Api.Eth               as Eth
 import           Network.Ethereum.Api.Provider
@@ -39,12 +42,8 @@ import qualified Network.Robonomics.Contract.Factory    as F
 import qualified Network.Robonomics.Contract.Lighthouse as L
 import           Network.Robonomics.Message
 
-randomNonce :: MonadRandom m => m (BytesN 32)
-randomNonce = do ba <- getRandomBytes 32
-                 return $ unsafeFromByteArrayAccess (ba :: Bytes)
-
 mkDemand :: MonadRandom m => Address -> Address -> UIntN 256 -> m Demand
-mkDemand lighthouse xrt deadline =
+mkDemand lighthouse xrt deadline nonce sender =
     Demand <$> getRandomBytes 34
            <*> getRandomBytes 34
            <*> pure xrt
@@ -53,7 +52,8 @@ mkDemand lighthouse xrt deadline =
            <*> pure "0x0000000000000000000000000000000000000000"
            <*> pure 0
            <*> pure deadline
-           <*> randomNonce
+           <*> pure nonce
+
            <*> pure ""
 
 -- | Generate random demand/offer pair
@@ -66,7 +66,7 @@ randomDeal :: ( MonadLogger m
            -- ^ XRT address
            -> Quantity
            -- ^ Current block number
-           -> SecKey
+           -> PrivateKey
            -- ^ Ethereum private key
            -> m (Demand, Offer)
 randomDeal lighthouse xrt block key = do
@@ -106,7 +106,7 @@ mkReport liability =
 randomReport :: (MonadRandom m, MonadLogger m)
              => Address
              -- ^ Liability address
-             -> SecKey
+             -> PrivateKey
              -- ^ Ethereum private key
              -> m Report
 randomReport liability key = do
@@ -117,3 +117,4 @@ randomReport liability key = do
     $logInfo $ "The report was generated: " <> T.pack (show signed)
 
     return signed
+-}

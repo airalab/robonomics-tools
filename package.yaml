@@ -24,7 +24,6 @@ dependencies:
 - optparse-applicative
 - concurrent-machines
 - base58-bytestring
-- secp256k1-haskell
 - monad-control 
 - monad-logger
 - data-default

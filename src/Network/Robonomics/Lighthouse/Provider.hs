@@ -18,7 +18,7 @@ import           Control.Monad.Logger                        (MonadLogger,
                                                               runStderrLoggingT)
 import           Control.Monad.Trans                         (lift)
 import           Control.Monad.Trans.Control                 (MonadBaseControl)
-import           Crypto.Secp256k1                            (derivePubKey)
+import           Crypto.Ethereum.Utils                       (derivePubKey)
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString.Char8                       as C8 (pack)
 import           Data.Default                                (def)
@@ -27,7 +27,8 @@ import           Data.Machine.Concurrent                     (mergeSum, (>~>))
 import           Data.Solidity.Prim.Address                  (fromPubKey)
 import qualified Data.Text                                   as T
 import           Lens.Micro                                  ((.~))
-import           Network.Ethereum.Account                    (PrivateKeyAccount)
+import           Network.Ethereum.Account                    (LocalKey (..),
+                                                              LocalKeyAccount)
 import qualified Network.Ethereum.Api.Eth                    as Eth
 import           Network.Ethereum.Api.Provider               (Provider,
                                                               forkWeb3,
@@ -47,13 +48,13 @@ import qualified Network.Robonomics.Liability                as Liability (creat
                                                                            finalize,
                                                                            list,
                                                                            read)
-import           Network.Robonomics.Liability.Generator      (randomDeal,
-                                                              randomReport)
+--import           Network.Robonomics.Liability.Generator      (randomDeal,
+--                                                              randomReport)
 import           Network.Robonomics.Lighthouse.SimpleMatcher (match)
 
 data Config = Config
     { web3Provider   :: !Provider
-    , web3Account    :: !PrivateKey
+    , web3Account    :: !LocalKey
     , ipfsProvider   :: !String
     , lighthouseName :: !String
     , ens            :: !Address
@@ -101,7 +102,7 @@ ipfs :: ( MonadBaseControl IO m
      => Config
      -> m ()
 ipfs Config{..} = do
-    let PrivateKey key _ = web3Account
+    let LocalKey key _ = web3Account
         accountAddress = fromPubKey (derivePubKey key)
         web3 = runWeb3' web3Provider . withAccount web3Account
 
@@ -146,7 +147,7 @@ resolve :: JsonRpc m
         -- ^ Registry address
         -> ByteString
         -- ^ Domain name
-        -> PrivateKeyAccount m Address
+        -> LocalKeyAccount m Address
         -- ^ Associated address
 resolve reg name = do
     r <- ensRegistry $ Reg.resolver node

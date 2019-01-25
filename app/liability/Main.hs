@@ -2,6 +2,8 @@
 module Main where
 
 import           Control.Monad.IO.Class        (liftIO)
+import           Crypto.Ethereum.Utils         (importKey)
+import           Data.ByteArray.HexString      (HexString)
 import           Network.Ethereum.Api.Provider
 import           Network.Ethereum.Chain        (foundation)
 import           Network.Ethereum.Web3
@@ -26,7 +28,7 @@ run :: Options -> IO ()
 run (Options cmd) =
     case cmd of
         Read a -> do
-            r <- runWeb3' infura $ withAccount (PrivateKey "0102030405060708090102030405060708090102030405060708090102030405" foundation) $ L.read a
+            r <- runWeb3' infura $ withAccount (LocalKey (importKey ("0102030405060708090102030405060708090102030405060708090102030405" :: HexString)) foundation) $ L.read a
             case r of
                 Right l -> do
                     print l

@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Options where
 
-import           Network.Ethereum.Account.PrivateKey    (PrivateKey (..))
+import           Crypto.Ethereum                        (PrivateKey)
+import           Crypto.Ethereum.Utils                  (importKey)
+import           Data.ByteArray.HexString               (HexString)
+import           Network.Ethereum.Account.LocalKey      (LocalKey (..))
 import           Network.Ethereum.Api.Provider          (Provider (..))
 import           Network.Ethereum.Chain
 import           Options.Applicative
@@ -21,8 +24,8 @@ providerOptions = P.Config
     <*> option str (long "lighthouse" <> value "airalab.lighthouse.4.robonomics.eth" <> metavar "ENS" <> help "Robonomics lighthouse name")
     <*> option str (long "ens" <> value "0x314159265dD8dbb310642f98f50C066173C1259b" <> metavar "ADDRESS" <> help "ENS registry contract")
 
-account :: Parser PrivateKey
-account = PrivateKey
+account :: Parser LocalKey
+account = LocalKey . (importKey :: HexString -> PrivateKey)
     <$> option str (long "private" <> metavar "KEY" <> help "Hex encoded private key")
     <*> option chain (long "chain" <> value foundation <> metavar "CHAIN_ID" <> help "Ethereum chain [foundation, ropsten, kovan, rikenby]")
 
