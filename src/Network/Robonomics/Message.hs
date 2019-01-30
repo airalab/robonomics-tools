@@ -59,7 +59,6 @@ data Demand = Demand
     , demandValidator    :: !Address
     , demandValidatorFee :: !(UIntN 256)
     , demandDeadline     :: !(UIntN 256)
-    , demandNonce        :: !(UIntN 256)
     , demandSender       :: !Address
     , demandSignature    :: !Bytes
     }
@@ -75,14 +74,15 @@ instance Show Demand where
             , C8.pack (show demandLighthouse)
             , C8.pack (show demandValidator)
             , C8.pack (show demandValidatorFee)
-            , C8.pack (show demandNonce)
             , C8.pack (show demandSender)
             , C8.pack (show (BA.convert demandSignature :: HexString))
             ]
 
 instance Generic Demand
+{-
 instance RobonomicsMsg Demand where
     hash = demandHash
+-}
 
 instance FromJSON Demand where
     parseJSON = withObject "Demand" $ \v -> Demand
@@ -94,7 +94,6 @@ instance FromJSON Demand where
         <*> v .: "validator"
         <*> v .: "validatorFee"
         <*> v .: "deadline"
-        <*> pure 0
         <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
@@ -107,7 +106,6 @@ data Offer = Offer
     , offerLighthouse    :: !Address
     , offerLighthouseFee :: !(UIntN 256)
     , offerDeadline      :: !(UIntN 256)
-    , offerNonce         :: !(UIntN 256)
     , offerSender        :: !Address
     , offerSignature     :: !Bytes
     }
@@ -123,14 +121,15 @@ instance Show Offer where
             , C8.pack (show offerValidator)
             , C8.pack (show offerLighthouse)
             , C8.pack (show offerLighthouseFee)
-            , C8.pack (show offerNonce)
             , C8.pack (show offerSender)
             , C8.pack (show (BA.convert offerSignature :: HexString))
             ]
 
 instance Generic Offer
+{-
 instance RobonomicsMsg Offer where
     hash = offerHash
+-}
 
 instance FromJSON Offer where
     parseJSON = withObject "Offer" $ \v -> Offer
@@ -142,7 +141,6 @@ instance FromJSON Offer where
         <*> v .: "lighthouse"
         <*> v .: "lighthouseFee"
         <*> v .: "deadline"
-        <*> pure 0
         <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
@@ -173,6 +171,7 @@ instance FromJSON Report where
         <*> v .: "success"
         <*> (b16decode =<< v .: "signature")
 
+{-
 demandHash :: Demand -> Digest Keccak_256
 {-# INLINE demandHash #-}
 demandHash Demand{..} =
@@ -200,6 +199,7 @@ offerHash Offer{..} =
                <> encode offerDeadline
                <> encode offerNonce
                <> encode offerSender
+-}
 
 reportHash :: Report -> Digest Keccak_256
 {-# INLINE reportHash #-}
