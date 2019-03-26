@@ -1,10 +1,11 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeOperators       #-}
 module Network.Robonomics.Message
   (
     RobonomicsMsg(..)
@@ -22,12 +23,15 @@ import qualified Data.ByteArray           as BA (convert, drop)
 import           Data.ByteArray.Encoding  (Base (Base16), convertFromBase)
 import           Data.ByteArray.HexString (HexString)
 import           Data.ByteArray.Sized     (unsafeSizedByteArray)
-import           Data.ByteString          (ByteString)
+import           Data.ByteString          (ByteString, empty)
 import           Data.ByteString.Base58   (bitcoinAlphabet, decodeBase58,
                                            encodeBase58)
 import qualified Data.ByteString.Char8    as C8 (concat, cons, pack, unpack)
 import qualified Data.ByteString.Short    as Short (fromShort, pack)
+import           Data.Maybe               (fromJust)
 import           Data.Monoid              ((<>))
+import           Data.Proxy               (Proxy (..))
+import           Data.Solidity.Abi        (AbiPut (..), AbiType (..))
 import           Data.Solidity.Abi.Codec  (encode)
 import           Data.Solidity.Prim       (Address, Bytes, BytesN, UIntN)
 import           Data.String.Extra        (toLowerFirst)
@@ -42,6 +46,13 @@ instance (KnownNat n, n <= 256) => FromJSON (UIntN n) where
 
 instance (KnownNat n, n <= 256) => ToJSON (UIntN n) where
     toJSON = toJSON . toInteger
+
+instance AbiType a => AbiType (Maybe a) where
+    isDynamic _ = isDynamic (Proxy :: Proxy a)
+
+instance AbiPut a => AbiPut (Maybe a) where
+    abiPut Nothing  = abiPut empty
+    abiPut (Just a) = abiPut a
 
 class RobonomicsMsg a where
     hash :: a -> Digest Keccak_256
@@ -59,6 +70,7 @@ data Demand = Demand
     , demandValidator    :: !Address
     , demandValidatorFee :: !(UIntN 256)
     , demandDeadline     :: !(UIntN 256)
+    , demandNonce        :: !(Maybe (UIntN 256))
     , demandSender       :: !Address
     , demandSignature    :: !Bytes
     }
@@ -79,10 +91,8 @@ instance Show Demand where
             ]
 
 instance Generic Demand
-{-
 instance RobonomicsMsg Demand where
     hash = demandHash
--}
 
 instance FromJSON Demand where
     parseJSON = withObject "Demand" $ \v -> Demand
@@ -94,6 +104,7 @@ instance FromJSON Demand where
         <*> v .: "validator"
         <*> v .: "validatorFee"
         <*> v .: "deadline"
+        <*> pure Nothing
         <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
@@ -106,6 +117,7 @@ data Offer = Offer
     , offerLighthouse    :: !Address
     , offerLighthouseFee :: !(UIntN 256)
     , offerDeadline      :: !(UIntN 256)
+    , offerNonce         :: !(Maybe (UIntN 256))
     , offerSender        :: !Address
     , offerSignature     :: !Bytes
     }
@@ -126,10 +138,8 @@ instance Show Offer where
             ]
 
 instance Generic Offer
-{-
 instance RobonomicsMsg Offer where
     hash = offerHash
--}
 
 instance FromJSON Offer where
     parseJSON = withObject "Offer" $ \v -> Offer
@@ -141,6 +151,7 @@ instance FromJSON Offer where
         <*> v .: "lighthouse"
         <*> v .: "lighthouseFee"
         <*> v .: "deadline"
+        <*> pure Nothing
         <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
@@ -171,7 +182,6 @@ instance FromJSON Report where
         <*> v .: "success"
         <*> (b16decode =<< v .: "signature")
 
-{-
 demandHash :: Demand -> Digest Keccak_256
 {-# INLINE demandHash #-}
 demandHash Demand{..} =
@@ -183,7 +193,7 @@ demandHash Demand{..} =
                <> BA.drop 12 (encode demandValidator)
                <> encode demandValidatorFee
                <> encode demandDeadline
-               <> encode demandNonce
+               <> encode (fromJust demandNonce)
                <> encode demandSender
 
 offerHash :: Offer -> Digest Keccak_256
@@ -197,9 +207,8 @@ offerHash Offer{..} =
                <> BA.drop 12 (encode offerLighthouse)
                <> encode offerLighthouseFee
                <> encode offerDeadline
-               <> encode offerNonce
+               <> encode (fromJust offerNonce)
                <> encode offerSender
--}
 
 reportHash :: Report -> Digest Keccak_256
 {-# INLINE reportHash #-}

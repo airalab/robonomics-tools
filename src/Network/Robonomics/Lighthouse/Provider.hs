@@ -12,13 +12,16 @@ import           Control.Monad                               (forever, void,
                                                               when)
 import           Control.Monad.Catch                         (MonadCatch,
                                                               catchAll)
+import           Control.Monad.Fail                          (MonadFail)
 import           Control.Monad.IO.Class                      (MonadIO (..))
 import           Control.Monad.Logger                        (MonadLogger,
                                                               logError, logInfo,
                                                               runStderrLoggingT)
 import           Control.Monad.Trans                         (lift)
 import           Control.Monad.Trans.Control                 (MonadBaseControl)
+import           Crypto.Ethereum                             (PrivateKey)
 import           Crypto.Ethereum.Utils                       (derivePubKey)
+import           Crypto.Random                               (MonadRandom)
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString.Char8                       as C8 (pack)
 import           Data.Default                                (def)
@@ -31,6 +34,7 @@ import           Network.Ethereum.Account                    (LocalKey (..),
                                                               LocalKeyAccount)
 import qualified Network.Ethereum.Api.Eth                    as Eth
 import           Network.Ethereum.Api.Provider               (Provider,
+                                                              Web3Error,
                                                               forkWeb3,
                                                               runWeb3')
 import           Network.Ethereum.Api.Types                  (DefaultBlock (Latest))
@@ -40,6 +44,7 @@ import qualified Network.Ethereum.Ens.Registry               as Reg
 import           Network.Ethereum.Web3
 import           Network.JsonRpc.TinyClient                  (JsonRpc)
 
+import qualified Network.Robonomics.Contract.Factory         as Factory
 import qualified Network.Robonomics.Contract.Lighthouse      as Lighthouse
 import qualified Network.Robonomics.Contract.XRT             as XRT
 import           Network.Robonomics.InfoChan                 (subscribe)
@@ -48,8 +53,8 @@ import qualified Network.Robonomics.Liability                as Liability (creat
                                                                            finalize,
                                                                            list,
                                                                            read)
---import           Network.Robonomics.Liability.Generator      (randomDeal,
---                                                              randomReport)
+import           Network.Robonomics.Liability.Generator      (randomDeal,
+                                                              randomReport)
 import           Network.Robonomics.Lighthouse.SimpleMatcher (match)
 
 data Config = Config
@@ -57,42 +62,49 @@ data Config = Config
     , web3Account    :: !LocalKey
     , ipfsProvider   :: !String
     , lighthouseName :: !String
+    , factoryName    :: !String
     , ens            :: !Address
     } deriving (Eq, Show)
 
-{-
-selfProvider :: (MonadIO m, MonadLogger m) => ProviderConfig -> m ()
-selfProvider ProviderConfig{..} = do
-    web3 $ withParam (to .~ xrtAddress) $ do
-        allowance <- XRT.allowance accountAddress factoryAddress
-        when (allowance == 0) $ do
-            XRT.approve factoryAddress 1000
-            return ()
-
+local :: ( MonadIO m
+         , MonadFail m
+         , MonadLogger m
+         , MonadRandom m
+         )
+      => Config
+      -> m ()
+local cfg@Config{..} = do
     liabilityChan <- liftIO newChan
+    connectLighthouse cfg $ \key accountAddress lighthouseAddress -> do
+        $logInfo "Starting local miner..."
+        $logInfo $ "Account address: " <> T.pack (show accountAddress)
 
-    runWeb3' web3Provider $ forkWeb3 $
-        Liability.list factoryAddress Latest Latest $ \_ liabilityAddress -> do
-            liability <- withAccount web3Account $ Liability.read liabilityAddress
-            liftIO $ writeChan liabilityChan (liabilityAddress, liability)
+        let web3 = runWeb3' web3Provider . withAccount web3Account
+        res <- web3 $ resolve ens $ C8.pack factoryName
+        case res of
+            Left _ -> do
+                $logError $ "Unable to find factory with name " <> T.pack factoryName
+                return ()
 
-    forever $ do
-        Right block <- runWeb3' web3Provider Eth.blockNumber
-        deal <- randomDeal lighthouseAddress xrtAddress block key
-        web3 $ Liability.create lighthouseAddress deal
-        selfReport liabilityChan
-  where
-    web3 = runWeb3' web3Provider . withAccount web3Account
-    PrivateKey key _ = web3Account
-    accountAddress = fromPubKey (derivePubKey key)
-    selfReport chan = do
-        (address, Liability{..}) <- liftIO $ readChan chan
-        if liabilityPromisor == accountAddress
-        then do
-            report <- randomReport address key
-            web3 $ Liability.finalize lighthouseAddress report
-        else selfReport chan
--}
+            Right factoryAddress -> do
+                runWeb3' web3Provider $ forkWeb3 $
+                    Liability.list factoryAddress Latest Latest $ \_ liabilityAddress -> do
+                        liability <- withAccount web3Account $ Liability.read liabilityAddress
+                        liftIO $ writeChan liabilityChan (liabilityAddress, liability)
+
+                forever $ do
+                    Right nonce <- web3 $ Factory.nonceOf accountAddress
+                    deal <- randomDeal lighthouseAddress nonce key
+                    web3 $ Liability.create lighthouseAddress deal
+
+                    let readChanWhile f chan = do
+                            x <- readChan chan
+                            if f x then readChanWhile f chan else return x
+                        notMine (_, Liability{..}) = liabilityPromisor /= accountAddress
+
+                    (address, Liability{..}) <- liftIO $ readChanWhile notMine liabilityChan
+                    report <- randomReport address key
+                    web3 $ Liability.finalize lighthouseAddress report
 
 ipfs :: ( MonadBaseControl IO m
         , MonadIO m
@@ -101,15 +113,23 @@ ipfs :: ( MonadBaseControl IO m
         )
      => Config
      -> m ()
-ipfs Config{..} = do
-    let LocalKey key _ = web3Account
-        accountAddress = fromPubKey (derivePubKey key)
-        web3 = runWeb3' web3Provider . withAccount web3Account
+ipfs cfg@Config{..} =
+    connectLighthouse cfg $ \_ accountAddress lighthouseAddress -> do
+        $logInfo "Starting IPFS provider..."
+        $logInfo $ "Account address: " <> T.pack (show accountAddress)
 
-    $logInfo "Starting Robonomics provider..."
-    $logInfo $ "Account address: " <> T.pack (show accountAddress)
+        let web3 = runWeb3' web3Provider . withAccount web3Account
+            web3Safe = flip catchAll ($logError . T.pack . show) . void . web3
+        runT_ $ subscribe ipfsProvider lighthouseName
+              >~> match
+              >~> mergeSum (autoM $ web3Safe . Liability.finalize lighthouseAddress)
+                           (autoM $ web3Safe . Liability.create lighthouseAddress)
 
-
+connectLighthouse :: (MonadIO m, MonadLogger m)
+                  => Config
+                  -> (PrivateKey -> Address -> Address -> m ())
+                  -> m ()
+connectLighthouse cfg@Config{..} ma = do
     res <- web3 $ resolve ens $ C8.pack lighthouseName
     case res of
         Left _ -> do
@@ -117,9 +137,9 @@ ipfs Config{..} = do
             return ()
 
         Right lighthouseAddress -> do
-            $logInfo $ "Lighthouse found, name: " <> T.pack lighthouseName <> ", address: " <> T.pack (show lighthouseAddress)
+            $logInfo $ "Lighthouse found, name: " <> T.pack lighthouseName
+                                                  <> ", address: " <> T.pack (show lighthouseAddress)
 
-            let web3Safe = flip catchAll ($logError . T.pack . show) . void . web3
             liftIO $ async $ runStderrLoggingT $ do
                 let xrtName = "xrt" ++ drop 11 (dropWhile (/= '.') lighthouseName)
                 Right xrtAddress <- runWeb3' web3Provider $
@@ -135,11 +155,11 @@ ipfs Config{..} = do
                     $logInfo $ "BALANCE " <> T.pack (show xrt) <> " XRT " <> T.pack (show (eth :: Ether))
 
                     liftIO $ threadDelay 60000000
-
-            runT_ $ subscribe ipfsProvider lighthouseName
-                >~> match
-                >~> mergeSum (autoM $ web3Safe . Liability.finalize lighthouseAddress)
-                             (autoM $ web3Safe . Liability.create lighthouseAddress)
+            ma key accountAddress lighthouseAddress
+  where
+    LocalKey key _ = web3Account
+    accountAddress = fromPubKey (derivePubKey key)
+    web3 = runWeb3' web3Provider . withAccount web3Account
 
 -- | Get address of ENS domain
 resolve :: JsonRpc m

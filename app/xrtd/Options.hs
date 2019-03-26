@@ -11,10 +11,15 @@ import           Options.Applicative
 
 import qualified Network.Robonomics.Lighthouse.Provider as P
 
-newtype Options = Options { providerConfig :: P.Config }
+data Options = Options
+    { providerConfig :: !P.Config
+    , providerLocal  :: !Bool
+    } deriving (Eq, Show)
 
 options :: Parser Options
-options = Options <$> providerOptions
+options = Options
+    <$> providerOptions
+    <*> switch (long "local" <> short 'l' <> help "Run in local mode: don't listen messages but generate it on local machine")
 
 providerOptions :: Parser P.Config
 providerOptions = P.Config
@@ -22,6 +27,7 @@ providerOptions = P.Config
     <*> account
     <*> option str (long "ipfs" <> value "/ip4/127.0.0.1/tcp/5001" <> metavar "MULTIADDR" <> help "IPFS node endpoint [DEFAULT: localhost]")
     <*> option str (long "lighthouse" <> value "airalab.lighthouse.5.robonomics.eth" <> metavar "ENS" <> help "Robonomics lighthouse name")
+    <*> option str (long "factory" <> value "factory.5.robonomics.eth" <> metavar "ENS" <> help "Robonomics liability factory name")
     <*> option str (long "ens" <> value "0x314159265dD8dbb310642f98f50C066173C1259b" <> metavar "ADDRESS" <> help "ENS registry contract")
 
 account :: Parser LocalKey

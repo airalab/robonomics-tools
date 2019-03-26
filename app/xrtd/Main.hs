@@ -1,10 +1,15 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Control.Monad.Logger                   (runStderrLoggingT)
+import           Control.Monad.IO.Class                 (liftIO)
+import           Control.Monad.Logger                   (LoggingT,
+                                                         runStderrLoggingT)
+import           Crypto.Random                          (MonadRandom (..))
 import           Options.Applicative
 
-import qualified Network.Robonomics.Lighthouse.Provider as Provider (ipfs)
+import qualified Network.Robonomics.Lighthouse.Provider as Provider (ipfs,
+                                                                     local)
 import           Options
 
 main :: IO ()
@@ -15,4 +20,9 @@ main = run =<< execParser opts
         (fullDesc <> progDesc "XRTd :: Robonomics network provider")
 
 run :: Options -> IO ()
-run (Options config) = runStderrLoggingT $ Provider.ipfs config
+run (Options config local)  = runStderrLoggingT $ provider config
+  where provider | local = Provider.local
+                 | otherwise = Provider.ipfs
+
+instance MonadRandom (LoggingT IO) where
+    getRandomBytes = liftIO . getRandomBytes

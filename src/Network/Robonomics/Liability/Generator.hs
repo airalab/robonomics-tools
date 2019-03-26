@@ -3,8 +3,7 @@
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
-module Network.Robonomics.Liability.Generator where
-{-
+module Network.Robonomics.Liability.Generator
     (
       randomDeal
     , randomReport
@@ -42,19 +41,33 @@ import qualified Network.Robonomics.Contract.Factory    as F
 import qualified Network.Robonomics.Contract.Lighthouse as L
 import           Network.Robonomics.Message
 
-mkDemand :: MonadRandom m => Address -> Address -> UIntN 256 -> m Demand
-mkDemand lighthouse xrt deadline nonce sender =
+randDemand :: MonadRandom m => Address -> UIntN 256 -> Address -> m Demand
+randDemand lighthouse nonce sender =
     Demand <$> getRandomBytes 34
            <*> getRandomBytes 34
-           <*> pure xrt
-           <*> pure 1
+           <*> pure "0x0000000000000000000000000000000000000000"
+           <*> pure 0
            <*> pure lighthouse
            <*> pure "0x0000000000000000000000000000000000000000"
            <*> pure 0
-           <*> pure deadline
-           <*> pure nonce
+           <*> pure (-1)
+           <*> pure (Just nonce)
+           <*> pure sender
+           <*> pure mempty
 
-           <*> pure ""
+pairOffer :: Demand -> Offer
+pairOffer Demand{..} =
+    Offer demandModel
+          demandObjective
+          demandToken
+          demandCost
+          demandLighthouse
+          demandValidator
+          0
+          demandDeadline
+          (fmap (+ 1) demandNonce)
+          demandSender
+          mempty
 
 -- | Generate random demand/offer pair
 randomDeal :: ( MonadLogger m
@@ -62,31 +75,18 @@ randomDeal :: ( MonadLogger m
               )
            => Address
            -- ^ Lighthouse address
-           -> Address
-           -- ^ XRT address
-           -> Quantity
-           -- ^ Current block number
+           -> UIntN 256
+           -- ^ Current nonce value
            -> PrivateKey
            -- ^ Ethereum private key
            -> m (Demand, Offer)
-randomDeal lighthouse xrt block key = do
-    let deadline = fromIntegral (block + 100)
-    $logDebug $ "Estimated deadline: " <> T.pack (show deadline)
+randomDeal lighthouse nonce key = do
+    let sender = fromPubKey (derivePubKey key)
 
-    demand@Demand{..} <- mkDemand lighthouse xrt deadline
+    demand <- randDemand lighthouse nonce sender
     $logDebug $ "Generated Demand message: " <> T.pack (show demand)
 
-    nonce <- randomNonce
-    let offer = Offer demandModel
-                      demandObjective
-                      demandToken
-                      demandCost
-                      demandLighthouse
-                      demandValidator
-                      0
-                      demandDeadline
-                      nonce
-                      mempty
+    let offer = pairOffer demand
     $logDebug $ "Associated Offer message: " <> T.pack (show offer)
 
     let signed = ( demand { demandSignature = sign key demand }
@@ -95,8 +95,8 @@ randomDeal lighthouse xrt block key = do
 
     return signed
 
-mkReport :: MonadRandom m => Address -> m Report
-mkReport liability =
+randReport :: MonadRandom m => Address -> m Report
+randReport liability =
     Report <$> pure liability
            <*> getRandomBytes 34
            <*> pure True
@@ -110,11 +110,10 @@ randomReport :: (MonadRandom m, MonadLogger m)
              -- ^ Ethereum private key
              -> m Report
 randomReport liability key = do
-    rep <- mkReport liability
+    rep <- randReport liability
     $logDebug $ "Generated REPORT: " <> T.pack (show rep)
 
     let signed = rep { reportSignature = sign key rep }
     $logInfo $ "The report was generated: " <> T.pack (show signed)
 
     return signed
--}
