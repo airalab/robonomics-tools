@@ -26,6 +26,7 @@ import           Data.ByteArray.Sized                   (unsafeFromByteArrayAcce
 import           Data.Default                           (def)
 import           Data.Either                            (rights)
 import           Data.Monoid                            (mempty)
+import           Data.Solidity.Abi.Codec                (encode, encode')
 import           Data.Solidity.Event                    (decodeEvent)
 import           Data.Solidity.Prim.Address             (fromPubKey)
 import qualified Data.Text                              as T
@@ -50,7 +51,7 @@ randDemand lighthouse nonce sender =
            <*> pure lighthouse
            <*> pure "0x0000000000000000000000000000000000000000"
            <*> pure 0
-           <*> pure (-1)
+           <*> pure (2 ^ 100)
            <*> pure (Just nonce)
            <*> pure sender
            <*> pure mempty
@@ -61,8 +62,8 @@ pairOffer Demand{..} =
           demandObjective
           demandToken
           demandCost
-          demandLighthouse
           demandValidator
+          demandLighthouse
           0
           demandDeadline
           (fmap (+ 1) demandNonce)
@@ -89,8 +90,8 @@ randomDeal lighthouse nonce key = do
     let offer = pairOffer demand
     $logDebug $ "Associated Offer message: " <> T.pack (show offer)
 
-    let signed = ( demand { demandSignature = sign key demand }
-                 , offer { offerSignature = sign key offer } )
+    let signed = ( demand { demandSignature = sign key demand, demandNonce = Nothing }
+                 , offer { offerSignature = sign key offer, offerNonce = Nothing } )
     $logInfo $ "The deal was generated: " <> T.pack (show signed)
 
     return signed

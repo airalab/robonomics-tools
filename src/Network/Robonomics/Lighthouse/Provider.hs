@@ -87,13 +87,18 @@ local cfg@Config{..} = do
                 return ()
 
             Right factoryAddress -> do
+                $logInfo $ "Factory found, name: " <> T.pack factoryName
+                                                   <> ", address: " <> T.pack (show factoryAddress)
+
                 runWeb3' web3Provider $ forkWeb3 $
                     Liability.list factoryAddress Latest Latest $ \_ liabilityAddress -> do
                         liability <- withAccount web3Account $ Liability.read liabilityAddress
                         liftIO $ writeChan liabilityChan (liabilityAddress, liability)
 
                 forever $ do
-                    Right nonce <- web3 $ Factory.nonceOf accountAddress
+                    Right nonce <- web3 $ withParam (to .~ factoryAddress) $ Factory.nonceOf accountAddress
+                    $logInfo $ "Account nonce: "<> T.pack (show nonce)
+
                     deal <- randomDeal lighthouseAddress nonce key
                     web3 $ Liability.create lighthouseAddress deal
 

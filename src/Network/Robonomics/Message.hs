@@ -23,7 +23,7 @@ import qualified Data.ByteArray           as BA (convert, drop)
 import           Data.ByteArray.Encoding  (Base (Base16), convertFromBase)
 import           Data.ByteArray.HexString (HexString)
 import           Data.ByteArray.Sized     (unsafeSizedByteArray)
-import           Data.ByteString          (ByteString, empty)
+import           Data.ByteString          (ByteString)
 import           Data.ByteString.Base58   (bitcoinAlphabet, decodeBase58,
                                            encodeBase58)
 import qualified Data.ByteString.Char8    as C8 (concat, cons, pack, unpack)
@@ -51,7 +51,7 @@ instance AbiType a => AbiType (Maybe a) where
     isDynamic _ = isDynamic (Proxy :: Proxy a)
 
 instance AbiPut a => AbiPut (Maybe a) where
-    abiPut Nothing  = abiPut empty
+    abiPut Nothing  = pure ()
     abiPut (Just a) = abiPut a
 
 class RobonomicsMsg a where
@@ -86,6 +86,8 @@ instance Show Demand where
             , C8.pack (show demandLighthouse)
             , C8.pack (show demandValidator)
             , C8.pack (show demandValidatorFee)
+            , C8.pack (show demandDeadline)
+            , C8.pack (show demandNonce)
             , C8.pack (show demandSender)
             , C8.pack (show (BA.convert demandSignature :: HexString))
             ]
@@ -133,6 +135,8 @@ instance Show Offer where
             , C8.pack (show offerValidator)
             , C8.pack (show offerLighthouse)
             , C8.pack (show offerLighthouseFee)
+            , C8.pack (show offerDeadline)
+            , C8.pack (show offerNonce)
             , C8.pack (show offerSender)
             , C8.pack (show (BA.convert offerSignature :: HexString))
             ]
@@ -194,7 +198,7 @@ demandHash Demand{..} =
                <> encode demandValidatorFee
                <> encode demandDeadline
                <> encode (fromJust demandNonce)
-               <> encode demandSender
+               <> BA.drop 12 (encode demandSender)
 
 offerHash :: Offer -> Digest Keccak_256
 {-# INLINE offerHash #-}
@@ -208,7 +212,7 @@ offerHash Offer{..} =
                <> encode offerLighthouseFee
                <> encode offerDeadline
                <> encode (fromJust offerNonce)
-               <> encode offerSender
+               <> BA.drop 12 (encode offerSender)
 
 reportHash :: Report -> Digest Keccak_256
 {-# INLINE reportHash #-}

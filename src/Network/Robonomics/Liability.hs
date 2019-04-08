@@ -95,7 +95,8 @@ create :: JsonRpc m
        -> LocalKeyAccount m TxReceipt
 create lighthouse (demand, offer) =
     withParam (to .~ lighthouse) $
-        F.createLiability (encode' demand) (encode' offer)
+        withParam (gasPrice .~ (1 :: Shannon)) $
+            F.createLiability (encode' demand) (encode' offer)
 
 -- | Finalize liability for given signed report
 finalize :: JsonRpc m
@@ -106,4 +107,5 @@ finalize :: JsonRpc m
          -> LocalKeyAccount m TxReceipt
 finalize lighthouse Report{..} =
     withParam (to .~ lighthouse) $
-        Lighthouse.finalizeLiability reportLiability reportResult reportSuccess reportSignature
+        withParam (gasPrice .~ (1 :: Shannon)) $
+            Lighthouse.finalizeLiability reportLiability reportResult reportSuccess reportSignature
