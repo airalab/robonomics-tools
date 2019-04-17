@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -14,19 +15,24 @@ import           Control.Monad.Catch                         (MonadCatch,
                                                               catchAll)
 import           Control.Monad.Fail                          (MonadFail)
 import           Control.Monad.IO.Class                      (MonadIO (..))
-import           Control.Monad.Logger                        (MonadLogger,
+import           Control.Monad.Logger                        (LoggingT,
+                                                              MonadLogger,
                                                               logError, logInfo,
-                                                              runStderrLoggingT)
+                                                              runChanLoggingT,
+                                                              runStderrLoggingT,
+                                                              unChanLoggingT)
+import           Control.Monad.Reader                        (ReaderT)
 import           Control.Monad.Trans                         (lift)
 import           Control.Monad.Trans.Control                 (MonadBaseControl)
 import           Crypto.Ethereum                             (PrivateKey)
 import           Crypto.Ethereum.Utils                       (derivePubKey)
-import           Crypto.Random                               (MonadRandom)
+import           Crypto.Random                               (MonadRandom (..))
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString.Char8                       as C8 (pack)
 import           Data.Default                                (def)
 import           Data.Machine
 import           Data.Machine.Concurrent                     (mergeSum, (>~>))
+import           Data.Solidity.Abi.Codec                     (decode)
 import           Data.Solidity.Prim.Address                  (fromPubKey)
 import qualified Data.Text                                   as T
 import           Lens.Micro                                  ((.~))
@@ -37,7 +43,10 @@ import           Network.Ethereum.Api.Provider               (Provider,
                                                               Web3Error,
                                                               forkWeb3,
                                                               runWeb3')
-import           Network.Ethereum.Api.Types                  (DefaultBlock (Latest))
+import           Network.Ethereum.Api.Types                  (DefaultBlock (Latest),
+                                                              Filter (..),
+                                                              changeTopics,
+                                                              receiptLogs)
 import           Network.Ethereum.Ens                        (namehash)
 import qualified Network.Ethereum.Ens.PublicResolver         as Resolver
 import qualified Network.Ethereum.Ens.Registry               as Reg
@@ -57,6 +66,9 @@ import           Network.Robonomics.Liability.Generator      (randomDeal,
                                                               randomReport)
 import           Network.Robonomics.Lighthouse.SimpleMatcher (match)
 
+instance MonadRandom (LoggingT (ReaderT r Web3)) where
+    getRandomBytes = liftIO . getRandomBytes
+
 data Config = Config
     { web3Provider   :: !Provider
     , web3Account    :: !LocalKey
@@ -74,7 +86,6 @@ local :: ( MonadIO m
       => Config
       -> m ()
 local cfg@Config{..} = do
-    liabilityChan <- liftIO newChan
     connectLighthouse cfg $ \key accountAddress lighthouseAddress -> do
         $logInfo "Starting local miner..."
         $logInfo $ "Account address: " <> T.pack (show accountAddress)
@@ -86,29 +97,15 @@ local cfg@Config{..} = do
                 $logError $ "Unable to find factory with name " <> T.pack factoryName
                 return ()
 
-            Right factoryAddress -> do
-                $logInfo $ "Factory found, name: " <> T.pack factoryName
-                                                   <> ", address: " <> T.pack (show factoryAddress)
-
-                runWeb3' web3Provider $ forkWeb3 $
-                    Liability.list factoryAddress Latest Latest $ \_ liabilityAddress -> do
-                        liability <- withAccount web3Account $ Liability.read liabilityAddress
-                        liftIO $ writeChan liabilityChan (liabilityAddress, liability)
-
-                forever $ do
+            Right factoryAddress -> forever $ do
                     Right nonce <- web3 $ withParam (to .~ factoryAddress) $ Factory.nonceOf accountAddress
                     $logInfo $ "Account nonce: "<> T.pack (show nonce)
 
                     deal <- randomDeal lighthouseAddress nonce key
-                    web3 $ Liability.create lighthouseAddress deal
+                    Right receipt <- web3 $ Liability.create lighthouseAddress deal
+                    let Right liabilityAddress = decode (changeTopics (receiptLogs receipt !! 2) !! 1)
 
-                    let readChanWhile f chan = do
-                            x <- readChan chan
-                            if f x then readChanWhile f chan else return x
-                        notMine (_, Liability{..}) = liabilityPromisor /= accountAddress
-
-                    (address, Liability{..}) <- liftIO $ readChanWhile notMine liabilityChan
-                    report <- randomReport address key
+                    report <- randomReport liabilityAddress key
                     web3 $ Liability.finalize lighthouseAddress report
 
 ipfs :: ( MonadBaseControl IO m

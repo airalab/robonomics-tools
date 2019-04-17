@@ -12,6 +12,8 @@ import           Data.Default                           (def)
 import           Data.Proxy                             (Proxy (..))
 import           Data.Solidity.Abi.Codec                (encode, encode')
 import           Lens.Micro                             ((.~))
+import           Network.Ethereum.Account.Safe          (safeConfirmations,
+                                                         safeSend)
 import           Network.Ethereum.Api.Types             (DefaultBlock,
                                                          Filter (..), Quantity,
                                                          changeBlockNumber)
@@ -95,8 +97,9 @@ create :: JsonRpc m
        -> LocalKeyAccount m TxReceipt
 create lighthouse (demand, offer) =
     withParam (to .~ lighthouse) $
-        withParam (gasPrice .~ (1 :: Shannon)) $
-            F.createLiability (encode' demand) (encode' offer)
+        withParam (gasPrice .~ (5 :: Shannon)) $
+            safeSend safeConfirmations $
+                F.CreateLiabilityData (encode' demand) (encode' offer)
 
 -- | Finalize liability for given signed report
 finalize :: JsonRpc m
@@ -107,5 +110,6 @@ finalize :: JsonRpc m
          -> LocalKeyAccount m TxReceipt
 finalize lighthouse Report{..} =
     withParam (to .~ lighthouse) $
-        withParam (gasPrice .~ (1 :: Shannon)) $
-            Lighthouse.finalizeLiability reportLiability reportResult reportSuccess reportSignature
+        withParam (gasPrice .~ (5 :: Shannon)) $
+            safeSend safeConfirmations $
+                Lighthouse.FinalizeLiabilityData reportLiability reportResult reportSuccess reportSignature
