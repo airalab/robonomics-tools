@@ -1,0 +1,118 @@
+= Robonomics on Ethereum tools 
+:Author: Robonomics developers
+:Revision: 0.1.0
+:toc:
+:sectnums:
+
+image:https://travis-ci.org/airalab/substrate-node-robonomics.svg?branch=master["Build Status", link="https://travis-ci.org/airalab/robonomics-tools"]
+
+== Intro
+
+AIRA (Autonomous Intelligent Robot Agent) project implements the standard of economic interaction between human-robot and robot-robot via liability smart contract. AIRA makes it possible to connect a variety of different robots to the market of robot liabilities for the direct sale of data from robot sensors, ordering of logistics services, and organization ordering of personalized products at fully automated enterprises.
+
+This source is a part of AIRA project. It implements their purposes using Ethereum with https://github.com/airalab/hs-web3[Haskell Web3].
+
+== Quick install
+
+Ensure you have Stack and Nix installed:
+
+[source, shell]
+----
+curl -sSL https://get.haskellstack.org/ | sh
+curl https://nixos.org/nix/install | sh
+----
+
+=== Install from binary caches
+
+. Setup Airalab binary cache at https://aira.cachix.org/
+
+. Import Airalab channel:
+[source, shell]
+----
+nix-channel --add http://aira.life/channels/aira-unstable/ aira
+nix-channel --update
+----
+
+. Install from binary cache:
+[source, shell]
+nix-env -iA aira.robonomics-tools
+
+=== Building from source
+
+Install robonomics tools from git source:
+
+[source, shell]
+git clone https://github.com/airalab/robonomics-tools && cd robonomics-tools && stack build --nix
+
+== Network maintaining
+
+Robonomics tools contains utility with name `xrtd`.
+
+[source]
+----
+Usage: xrtd [--web3 URI] --private KEY [--chain CHAIN_ID] [--ipfs MULTIADDR]
+            [--lighthouse ENS] [--factory ENS] [--ens ADDRESS] [-l|--local]
+  XRTd :: Robonomics network provider
+
+Available options:
+  --web3 URI               Ethereum node endpoint [DEFAULT: Infura mainnet]
+  --private KEY            Hex encoded private key
+  --chain CHAIN_ID         Ethereum chain [foundation, ropsten, kovan, rikenby]
+  --ipfs MULTIADDR         IPFS node endpoint [DEFAULT: localhost]
+  --lighthouse ENS         Robonomics lighthouse name
+  --factory ENS            Robonomics liability factory name
+  --ens ADDRESS            ENS registry contract
+  -l,--local               Run in local mode: don't listen messages but generate
+                           it on local machine
+  -h,--help                Show this help text
+----
+
+This is the main application for Robonomics provider.
+
+=== Local mining
+
+Robonomics network makes XRT emission for any liability contract finalization.
+This is mean that it doesnt matter liability is useful or not. In this case you
+can just generate and settle liability with random fields to get Robonomics network emission.
+
+. To start XRT mining you need a little bit XRT as a stake, buy it on Exchanges or some person. 
+
+. Create your own lighthouse smart contract using the Factory DApp at https://dev.aira.life/net/.
+
+. Refill your stake at lighthouse smart contract using Factory DApp.
+
+. Launch `xrtd` with private key of stake holder.
+[source, shell]
+xrtd -l --private $PRIVATE_KEY
+
+=== IPFS PubSub messages 
+
+Creation and finalization of useful liablities can give some additional value in XRT. Promisee can
+boost libility creation using lighthouse fee. To collect this fee just enable IPFS PubSub listener
+via drop `-l` flag. In this case `xrtd` will listen incoming usefule Robonomics messages via IPFS
+PubSub and create new liability when messages matched.
+
+[source, shell]
+xrtd --private $PRIVATE_KEY
+
+== Liability explorer
+
+Using `liability` command robot liabilities could be listed.
+
+[source]
+----
+Usage: liability COMMAND
+  Robonomics liability smart contract ops
+
+Available options:
+  -h,--help                Show this help text
+
+Available commands:
+  read                     Read liability smart contract
+  list                     List liability smart contracts
+----
+
+To get liability details just run command with liability contract address as argument:
+
+[source, shell]
+liability read 0x...
