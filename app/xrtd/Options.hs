@@ -11,6 +11,9 @@ import           Options.Applicative
 
 import qualified Network.Robonomics.Lighthouse.Provider as P
 
+infura :: Provider
+infura = HttpProvider "https://mainnet.infura.io/v3/1ba07380f3e740148f89852159695c73"
+
 data Options = Options
     { providerConfig :: !P.Config
     , providerLocal  :: !Bool
@@ -46,6 +49,3 @@ chain = eitherReader go
     go str | valid str && (read str :: Integer) > 0 = Right (read str)
            | otherwise = Left "CHAIN_ID shoud be [foundation, ropsten, kovan, rikenby] or positive integer"
     valid = all $ flip elem ("1234567890" :: String)
-
-infura :: Provider
-infura = HttpProvider "https://mainnet.infura.io/v3/1ba07380f3e740148f89852159695c73"

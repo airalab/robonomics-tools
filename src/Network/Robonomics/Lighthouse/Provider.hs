@@ -30,8 +30,6 @@ import           Crypto.Random                               (MonadRandom (..))
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString.Char8                       as C8 (pack)
 import           Data.Default                                (def)
-import           Data.Machine
-import           Data.Machine.Concurrent                     (mergeSum, (>~>))
 import           Data.Solidity.Abi.Codec                     (decode)
 import           Data.Solidity.Prim.Address                  (fromPubKey)
 import qualified Data.Text                                   as T
@@ -52,11 +50,15 @@ import qualified Network.Ethereum.Ens.PublicResolver         as Resolver
 import qualified Network.Ethereum.Ens.Registry               as Reg
 import           Network.Ethereum.Web3
 import           Network.JsonRpc.TinyClient                  (JsonRpc)
+import           Pipes                                       (await, for,
+                                                              runEffect, yield,
+                                                              (>->))
 
 import qualified Network.Robonomics.Contract.Factory         as Factory
 import qualified Network.Robonomics.Contract.Lighthouse      as Lighthouse
 import qualified Network.Robonomics.Contract.XRT             as XRT
 import           Network.Robonomics.InfoChan                 (subscribe)
+import           Network.Robonomics.InfoChan                 (Msg (MkReport))
 import           Network.Robonomics.Liability                (Liability (..))
 import qualified Network.Robonomics.Liability                as Liability (create,
                                                                            finalize,
@@ -64,7 +66,7 @@ import qualified Network.Robonomics.Liability                as Liability (creat
                                                                            read)
 import           Network.Robonomics.Liability.Generator      (randomDeal,
                                                               randomReport)
-import           Network.Robonomics.Lighthouse.SimpleMatcher (match)
+import           Network.Robonomics.Lighthouse.SimpleMatcher (matchOrders)
 
 instance MonadRandom (LoggingT (ReaderT r Web3)) where
     getRandomBytes = liftIO . getRandomBytes
@@ -85,7 +87,7 @@ local :: ( MonadIO m
          )
       => Config
       -> m ()
-local cfg@Config{..} = do
+local cfg@Config{..} =
     connectLighthouse cfg $ \key accountAddress lighthouseAddress -> do
         $logInfo "Starting local miner..."
         $logInfo $ "Account address: " <> T.pack (show accountAddress)
@@ -122,10 +124,21 @@ ipfs cfg@Config{..} =
 
         let web3 = runWeb3' web3Provider . withAccount web3Account
             web3Safe = flip catchAll ($logError . T.pack . show) . void . web3
-        runT_ $ subscribe ipfsProvider lighthouseName
-              >~> match
-              >~> mergeSum (autoM $ web3Safe . Liability.finalize lighthouseAddress)
-                           (autoM $ web3Safe . Liability.create lighthouseAddress)
+
+            create   = lift . web3Safe . Liability.create lighthouseAddress
+            finalize = lift . web3Safe . Liability.finalize lighthouseAddress
+
+            dispatchReport = forever $ do
+                msg <- await
+                case msg of
+                  MkReport report -> finalize report
+                  _               -> yield msg
+
+            orders = subscribe ipfsProvider lighthouseName
+                  >-> dispatchReport
+                  >-> matchOrders
+
+        runEffect $ for orders create
 
 connectLighthouse :: (MonadIO m, MonadLogger m)
                   => Config

@@ -1,5 +1,5 @@
 name:                robonomics-tools
-version:             0.4.2.0
+version:             0.5.0.0
 github:              "airalab/robonomics-tools"
 license:             BSD3
 author:              "Alexander Krupenkin"
@@ -7,7 +7,7 @@ maintainer:          "akru@aira.life"
 copyright:           "(c) Airalab <research@aira.life>"
 
 extra-source-files:
-- README.md
+- README.adoc
 - CHANGELOG.md
 
 # Metadata used when publishing your package
@@ -22,7 +22,6 @@ description:         Please see the README on GitHub at <https://github.com/aira
 dependencies:
 - base >= 4.7 && < 5
 - optparse-applicative
-- concurrent-machines
 - base58-bytestring
 - monad-control 
 - monad-logger
@@ -33,12 +32,12 @@ dependencies:
 - containers
 - exceptions
 - microlens
-- machines
 - hashable
 - process
 - memory
 - aeson
 - async
+- pipes
 - text
 - web3
 - mtl
@@ -47,6 +46,16 @@ library:
   source-dirs: src
 
 executables:
+  ipfs-subscriber:
+    main:                Main.hs
+    source-dirs:         app/ipfs-subscriber
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - robonomics-tools
+
   liability:
     main:                Main.hs
     source-dirs:         app/liability

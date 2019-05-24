@@ -14,10 +14,10 @@ import           Control.Monad.Logger        (MonadLogger, logDebug, logInfo)
 import           Control.Monad.Trans         (lift)
 import           Data.Hashable               (Hashable (..))
 import           Data.IntMap                 (delete, insert, size, (!?))
-import           Data.Machine                (ProcessT, await, construct, yield)
 import           Data.Solidity.Prim          (Address, Bytes, UIntN)
-import qualified Data.Text                   as T
+import qualified Data.Text                   as T (pack)
 import           GHC.TypeLits
+import           Pipes                       (Pipe, await, yield)
 
 import           Network.Robonomics.InfoChan (Msg (..))
 import           Network.Robonomics.Message  (Demand (..), Offer (..), Report)
@@ -34,8 +34,8 @@ instance Hashable Bytes where
     hash = hash . show
     hashWithSalt x = hashWithSalt x . hash
 
-match :: MonadLogger m => ProcessT m Msg (Either Report (Demand, Offer))
-match = construct $ go mempty mempty
+matchOrders :: MonadLogger m => Pipe Msg (Demand, Offer) m ()
+matchOrders = go mempty mempty
   where
     toKey = \case
         MkDemand Demand{..} -> hash demandModel `hashWithSalt` demandObjective
@@ -61,17 +61,15 @@ match = construct $ go mempty mempty
           MkDemand ask ->
               case bids !? key of
                   Nothing -> go (insert key ask asks) bids
-                  Just bid -> do yield $ Right (ask, bid)
+                  Just bid -> do yield (ask, bid)
                                  lift $ $logInfo $ "Matched: " <> T.pack (show (ask, bid))
                                  go asks (delete key bids)
 
           MkOffer bid ->
               case asks !? key of
                     Nothing -> go asks (insert key bid bids)
-                    Just ask -> do yield $ Right (ask, bid)
+                    Just ask -> do yield (ask, bid)
                                    lift $ $logInfo $ "Matched: " <> T.pack (show (ask, bid))
                                    go (delete key asks) bids
 
-          MkReport rep -> do yield $ Left rep
-                             lift $ $logDebug $ "Passthrow Report: " <> T.pack (show rep)
-                             go asks bids
+          _ -> go asks bids
