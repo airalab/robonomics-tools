@@ -20,6 +20,7 @@ import           Control.Monad.Trans                    (lift)
 import           Crypto.Ethereum                        (PrivateKey,
                                                          derivePubKey)
 import           Crypto.Random                          (MonadRandom (..))
+import           Data.Base58String.Bitcoin              (fromBytes)
 import qualified Data.ByteArray                         as BA
 import           Data.ByteArray.HexString               (HexString)
 import           Data.ByteArray.Sized                   (unsafeFromByteArrayAccess)
@@ -44,8 +45,8 @@ import           Network.Robonomics.Message
 
 randDemand :: MonadRandom m => Address -> UIntN 256 -> Address -> m Demand
 randDemand lighthouse nonce sender =
-    Demand <$> getRandomBytes 34
-           <*> getRandomBytes 34
+    Demand <$> fmap fromBytes (getRandomBytes 34)
+           <*> fmap fromBytes (getRandomBytes 34)
            <*> pure "0x0000000000000000000000000000000000000000"
            <*> pure 0
            <*> pure lighthouse
@@ -99,7 +100,7 @@ randomDeal lighthouse nonce key = do
 randReport :: MonadRandom m => Address -> m Report
 randReport liability =
     Report <$> pure liability
-           <*> getRandomBytes 34
+           <*> fmap fromBytes (getRandomBytes 34)
            <*> pure True
            <*> pure mempty
 

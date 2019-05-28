@@ -12,6 +12,7 @@ module Network.Robonomics.Lighthouse.SimpleMatcher where
 
 import           Control.Monad.Logger        (MonadLogger, logDebug, logInfo)
 import           Control.Monad.Trans         (lift)
+import           Data.Base58String.Bitcoin   (Base58String, toBytes)
 import           Data.Hashable               (Hashable (..))
 import           Data.IntMap                 (delete, insert, size, (!?))
 import           Data.Solidity.Prim          (Address, Bytes, UIntN)
@@ -32,6 +33,10 @@ instance Hashable Address where
 
 instance Hashable Bytes where
     hash = hash . show
+    hashWithSalt x = hashWithSalt x . hash
+
+instance Hashable Base58String where
+    hash = hash . toBytes
     hashWithSalt x = hashWithSalt x . hash
 
 matchOrders :: MonadLogger m => Pipe Msg (Demand, Offer) m ()

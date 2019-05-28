@@ -14,31 +14,30 @@ module Network.Robonomics.Message
   , Report(..)
   ) where
 
-import           Crypto.Ethereum          (PrivateKey, signMessage)
-import           Crypto.Hash              (Digest, Keccak_256)
-import qualified Crypto.Hash              as Crypto
-import           Data.Aeson               (FromJSON (..), ToJSON (..),
-                                           withObject, (.:))
-import qualified Data.ByteArray           as BA (convert, drop)
-import           Data.ByteArray.Encoding  (Base (Base16), convertFromBase)
-import           Data.ByteArray.HexString (HexString)
-import           Data.ByteArray.Sized     (unsafeSizedByteArray)
-import           Data.ByteString          (ByteString)
-import           Data.ByteString.Base58   (bitcoinAlphabet, decodeBase58,
-                                           encodeBase58)
-import qualified Data.ByteString.Char8    as C8 (concat, cons, pack, unpack)
-import qualified Data.ByteString.Short    as Short (fromShort, pack)
-import           Data.Maybe               (fromJust)
-import           Data.Monoid              ((<>))
-import           Data.Proxy               (Proxy (..))
-import           Data.Solidity.Abi        (AbiPut (..), AbiType (..))
-import           Data.Solidity.Abi.Codec  (encode)
-import           Data.Solidity.Prim       (Address, Bytes, BytesN, UIntN)
-import           Data.String.Extra        (toLowerFirst)
-import           Data.Text                (Text)
-import           Data.Text.Encoding       (encodeUtf8)
-import           Generics.SOP             (Generic)
-import qualified GHC.Generics             as GHC (Generic)
+import           Crypto.Ethereum           (PrivateKey, signMessage)
+import           Crypto.Hash               (Digest, Keccak_256)
+import qualified Crypto.Hash               as Crypto
+import           Data.Aeson                (FromJSON (..), ToJSON (..),
+                                            withObject, (.:))
+import           Data.Base58String.Bitcoin (Base58String, toBytes)
+import qualified Data.ByteArray            as BA (convert, drop)
+import           Data.ByteArray.Encoding   (Base (Base16), convertFromBase)
+import           Data.ByteArray.HexString  (HexString)
+import           Data.ByteArray.Sized      (unsafeSizedByteArray)
+import           Data.ByteString           (ByteString)
+import qualified Data.ByteString.Char8     as C8 (concat, cons, pack, unpack)
+import qualified Data.ByteString.Short     as Short (fromShort, pack)
+import           Data.Maybe                (fromJust)
+import           Data.Monoid               ((<>))
+import           Data.Proxy                (Proxy (..))
+import           Data.Solidity.Abi         (AbiPut (..), AbiType (..))
+import           Data.Solidity.Abi.Codec   (encode)
+import           Data.Solidity.Prim        (Address, Bytes, BytesN, UIntN)
+import           Data.String.Extra         (toLowerFirst)
+import           Data.Text                 (Text)
+import           Data.Text.Encoding        (encodeUtf8)
+import           Generics.SOP              (Generic)
+import qualified GHC.Generics              as GHC (Generic)
 import           GHC.TypeLits
 
 instance (KnownNat n, n <= 256) => FromJSON (UIntN n) where
@@ -54,6 +53,12 @@ instance AbiPut a => AbiPut (Maybe a) where
     abiPut Nothing  = pure ()
     abiPut (Just a) = abiPut a
 
+instance AbiType Base58String where
+    isDynamic _ = True
+
+instance AbiPut Base58String where
+    abiPut = abiPut . toBytes
+
 class RobonomicsMsg a where
     hash :: a -> Digest Keccak_256
 
@@ -62,8 +67,8 @@ class RobonomicsMsg a where
     sign key = signMessage key . hash
 
 data Demand = Demand
-    { demandModel        :: !Bytes
-    , demandObjective    :: !Bytes
+    { demandModel        :: !Base58String
+    , demandObjective    :: !Base58String
     , demandToken        :: !Address
     , demandCost         :: !(UIntN 256)
     , demandLighthouse   :: !Address
@@ -79,8 +84,8 @@ data Demand = Demand
 instance Show Demand where
     show Demand{..} =
         C8.unpack $ C8.concat $ C8.cons ' ' <$>
-            [ encodeBase58 bitcoinAlphabet (BA.convert demandModel)
-            , encodeBase58 bitcoinAlphabet (BA.convert demandObjective)
+            [ C8.pack (show demandModel)
+            , C8.pack (show demandObjective)
             , C8.pack (show demandToken)
             , C8.pack (show demandCost)
             , C8.pack (show demandLighthouse)
@@ -98,8 +103,8 @@ instance RobonomicsMsg Demand where
 
 instance FromJSON Demand where
     parseJSON = withObject "Demand" $ \v -> Demand
-        <$> (b58decode =<< v .: "model")
-        <*> (b58decode =<< v .: "objective")
+        <$> v .: "model"
+        <*> v .: "objective"
         <*> v .: "token"
         <*> v .: "cost"
         <*> v .: "lighthouse"
@@ -111,8 +116,8 @@ instance FromJSON Demand where
         <*> (b16decode =<< v .: "signature")
 
 data Offer = Offer
-    { offerModel         :: !Bytes
-    , offerObjective     :: !Bytes
+    { offerModel         :: !Base58String
+    , offerObjective     :: !Base58String
     , offerToken         :: !Address
     , offerCost          :: !(UIntN 256)
     , offerValidator     :: !Address
@@ -128,8 +133,8 @@ data Offer = Offer
 instance Show Offer where
     show Offer{..} =
         C8.unpack $ C8.concat $ C8.cons ' ' <$>
-            [ encodeBase58 bitcoinAlphabet (BA.convert offerModel)
-            , encodeBase58 bitcoinAlphabet (BA.convert offerObjective)
+            [ C8.pack (show offerModel)
+            , C8.pack (show offerObjective)
             , C8.pack (show offerToken)
             , C8.pack (show offerCost)
             , C8.pack (show offerValidator)
@@ -147,8 +152,8 @@ instance RobonomicsMsg Offer where
 
 instance FromJSON Offer where
     parseJSON = withObject "Offer" $ \v -> Offer
-        <$> (b58decode =<< v .: "model")
-        <*> (b58decode =<< v .: "objective")
+        <$> v .: "model"
+        <*> v .: "objective"
         <*> v .: "token"
         <*> v .: "cost"
         <*> v .: "validator"
@@ -161,7 +166,7 @@ instance FromJSON Offer where
 
 data Report = Report
   { reportLiability :: !Address
-  , reportResult    :: !Bytes
+  , reportResult    :: !Base58String
   , reportSuccess   :: !Bool
   , reportSignature :: !Bytes
   } deriving (Eq, GHC.Generic)
@@ -170,7 +175,7 @@ instance Show Report where
     show Report{..} =
         C8.unpack $ C8.concat $ C8.cons ' ' <$>
             [ C8.pack (show reportLiability)
-            , encodeBase58 bitcoinAlphabet (BA.convert reportResult)
+            , C8.pack (show reportResult)
             , C8.pack (show reportSuccess)
             , C8.pack (show (BA.convert reportSignature :: HexString))
             ]
@@ -182,15 +187,15 @@ instance RobonomicsMsg Report where
 instance FromJSON Report where
     parseJSON = withObject "Report" $ \v -> Report
         <$> v .: "liability"
-        <*> (b58decode =<< v .: "result")
+        <*> v .: "result"
         <*> v .: "success"
         <*> (b16decode =<< v .: "signature")
 
 demandHash :: Demand -> Digest Keccak_256
 {-# INLINE demandHash #-}
 demandHash Demand{..} =
-    Crypto.hash $ demandModel
-               <> demandObjective
+    Crypto.hash $ toBytes demandModel
+               <> toBytes demandObjective
                <> BA.drop 12 (encode demandToken)
                <> encode demandCost
                <> BA.drop 12 (encode demandLighthouse)
@@ -203,8 +208,8 @@ demandHash Demand{..} =
 offerHash :: Offer -> Digest Keccak_256
 {-# INLINE offerHash #-}
 offerHash Offer{..} =
-    Crypto.hash $ offerModel
-               <> offerObjective
+    Crypto.hash $ toBytes offerModel
+               <> toBytes offerObjective
                <> BA.drop 12 (encode offerToken)
                <> encode offerCost
                <> BA.drop 12 (encode offerValidator)
@@ -218,16 +223,8 @@ reportHash :: Report -> Digest Keccak_256
 {-# INLINE reportHash #-}
 reportHash Report{..} =
     Crypto.hash $ BA.drop 12 (encode reportLiability)
-               <> reportResult
+               <> toBytes reportResult
                <> BA.drop 31 (encode reportSuccess)
 
-b58decode :: Monad m => Text -> m Bytes
-b58decode = toError . maybe (Left "Unable to decode base 58") Right
-          . fmap BA.convert . decodeBase58 bitcoinAlphabet . encodeUtf8
-
 b16decode :: Monad m => Text -> m Bytes
-b16decode = toError . convertFromBase Base16 . encodeUtf8
-
-toError :: Monad m => Either String a -> m a
-{-# INLINE toError #-}
-toError = either fail return
+b16decode = either fail return . convertFromBase Base16 . encodeUtf8

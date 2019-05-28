@@ -4,9 +4,8 @@ module Network.Robonomics.Liability where
 
 import           Control.Monad.Reader                   (asks)
 import           Control.Monad.Trans                    (lift)
+import           Data.Base58String.Bitcoin              (toBytes)
 import           Data.ByteArray                         (convert)
-import           Data.ByteString.Base58                 (bitcoinAlphabet,
-                                                         encodeBase58)
 import qualified Data.ByteString.Char8                  as C8
 import           Data.Default                           (def)
 import           Data.Proxy                             (Proxy (..))
@@ -42,8 +41,8 @@ data Liability = Liability
 instance Show Liability where
     show Liability{..} = ("Liability" ++) $
         C8.unpack $ C8.concat $ C8.cons ' ' <$>
-            [ encodeBase58 bitcoinAlphabet (convert liabilityModel)
-            , encodeBase58 bitcoinAlphabet (convert liabilityObjective)
+            [ C8.pack (show liabilityModel)
+            , C8.pack (show liabilityObjective)
             , C8.pack (show liabilityLighthouse)
             , C8.pack (show liabilityPromisee)
             , C8.pack (show liabilityPromisor)
@@ -112,4 +111,5 @@ finalize lighthouse Report{..} =
     withParam (to .~ lighthouse) $
         withParam (gasPrice .~ (5 :: Shannon)) $
             safeSend safeConfirmations $
-                Lighthouse.FinalizeLiabilityData reportLiability reportResult reportSuccess reportSignature
+                Lighthouse.FinalizeLiabilityData reportLiability resultBytes reportSuccess reportSignature
+  where resultBytes = convert (toBytes reportResult)

@@ -22,8 +22,8 @@ description:         Please see the README on GitHub at <https://github.com/aira
 dependencies:
 - base >= 4.7 && < 5
 - optparse-applicative
-- base58-bytestring
 - monad-control 
+- base58string
 - monad-logger
 - data-default
 - generics-sop
