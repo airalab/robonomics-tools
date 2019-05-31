@@ -63,11 +63,11 @@ run Options{..} = runStderrLoggingT $ do
             runWeb3' optionsProvider $ do
                 -- Lighthouses in the past
                 event flt $ \(F.NewLighthouse _ name) -> do
-                    liftIO $ writeChan chan $ T.unpack name ++ domain
+                    liftIO $ writeChan chan $ T.unpack name ++ ".lighthouse" ++ domain
                     return ContinueEvent
                 -- Lighthouses in the future
                 event (flt { filterFromBlock = Latest }) $ \(F.NewLighthouse _ name) -> do
-                    liftIO $ writeChan chan $ T.unpack name ++ domain
+                    liftIO $ writeChan chan $ T.unpack name ++ ".lighthouse" ++ domain
                     return ContinueEvent
 
             $logInfo $ "Lookup lighthouses of " <> T.pack optionsFactory
