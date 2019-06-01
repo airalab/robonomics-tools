@@ -56,7 +56,7 @@ run Options{..} = runStderrLoggingT $ do
         Right factory -> do
             let flt = (def :: Filter F.NewLighthouse)
                     { filterAddress   = Just [ factory ]
-                    , filterFromBlock = BlockWithNumber 7584512   -- factory creation block
+                    , filterFromBlock = optionsFromBlock
                     }
 
             chan <- liftIO newChan
