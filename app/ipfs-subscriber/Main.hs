@@ -7,6 +7,7 @@ import           Control.Concurrent                     (forkIO)
 import           Control.Concurrent.Chan                (newChan, readChan,
                                                          writeChan)
 import           Control.Monad                          (forM_, forever, void)
+import           Control.Monad.Catch                    (catchAll)
 import           Control.Monad.IO.Class                 (liftIO)
 import           Control.Monad.Logger                   (LoggingT, logError,
                                                          logInfo,
@@ -79,5 +80,6 @@ run Options{..} = runStderrLoggingT $ do
                 $logInfo $ "Subsription started for " <> T.pack lighthouse
 
 subscribe :: String -> String -> IO ()
-subscribe api topic = void $ liftIO $ forkIO $
-    runEffect $ for (PubSub.subscribe api topic) $ void . pure
+subscribe api topic = void $ liftIO $ forkIO $ forever $
+    flip catchAll print $
+        runEffect $ for (PubSub.subscribe api topic) $ void . pure
