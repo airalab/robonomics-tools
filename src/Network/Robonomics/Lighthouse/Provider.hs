@@ -122,11 +122,11 @@ ipfs cfg@Config{..} =
         $logInfo "Starting IPFS provider..."
         $logInfo $ "Account address: " <> T.pack (show accountAddress)
 
-        let web3 = runWeb3' web3Provider . withAccount web3Account
-            web3Safe = flip catchAll ($logError . T.pack . show) . void . web3
+        let asyncWeb3 = runWeb3' web3Provider . forkWeb3 . withAccount web3Account
+            runSafe = flip catchAll ($logError . T.pack . show) . void
 
-            create   = lift . web3Safe . Liability.create lighthouseAddress
-            finalize = lift . web3Safe . Liability.finalize lighthouseAddress
+            create   = lift . runSafe . asyncWeb3 . Liability.create lighthouseAddress
+            finalize = lift . runSafe . asyncWeb3 . Liability.finalize lighthouseAddress
 
             dispatchReport = forever $ do
                 msg <- await
