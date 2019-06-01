@@ -1,13 +1,14 @@
 # Changelog for robonomics-tools
 
-## [0.5.0.0] 2019-06-01
+## [0.5.1.0] 2019-06-01
 ### Added
 - ipfs-subscriber: start lighthouse scan block parameter
 
 ### Changed 
-- xrtd: Async transaction sending
+- xrtd: async lighthouse transaction sending
 - ipfs-subscriber: lighthouse name fixes
-- ipfs-subscriber: catch IPFS subscribe excheptions
+- ipfs-subscriber: catch IPFS subscribe exceptions
+- base58-bytestring -> base58string
 
 ## [0.5.0.0] 2019-05-23
 ### Added
