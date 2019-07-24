@@ -8,14 +8,15 @@ import           Data.Aeson              (FromJSON (..), eitherDecode,
                                           withObject, (.:))
 import           Data.ByteArray.Encoding (Base (Base64), convertFromBase)
 import           Data.ByteString         (ByteString)
-import qualified Data.ByteString.Char8   as C8 (hGetLine)
+import qualified Data.ByteString.Char8   as C8 (hGetLine, unpack)
 import           Data.ByteString.Lazy    (fromStrict)
 import qualified Data.Text               as T (pack)
 import           Data.Text.Encoding      (encodeUtf8)
-import           Pipes                   (Producer, yield)
-import           System.Process          (CreateProcess (std_out),
+import           Pipes                   (Consumer, Producer, await, yield)
+import           System.Process          (CreateProcess (std_in, std_out),
                                           StdStream (CreatePipe), createProcess,
-                                          proc)
+                                          proc, waitForProcess,
+                                          withCreateProcess)
 
 newtype MessagePayload
   = MessagePayload { unMessagePayload :: ByteString }
@@ -48,3 +49,16 @@ subscribe ipfsApi topic = do
         case decodeRawMsg raw_msg of
             Left e    -> liftIO $ putStrLn e
             Right msg -> yield msg
+
+-- | Publish to topic
+publish :: MonadIO m
+        => String
+        -- ^ IPFS api URI
+        -> String
+        -- ^ IPFS topic
+        -> Consumer ByteString m ()
+        -- ^ JSON payload value stream
+publish ipfsApi topic = forever $ do
+    msg <- await
+    let pubsub = proc "ipfs" ["--api", ipfsApi, "pubsub", "pub", topic, C8.unpack msg]
+    liftIO $ withCreateProcess pubsub $ \_ _ _ -> waitForProcess

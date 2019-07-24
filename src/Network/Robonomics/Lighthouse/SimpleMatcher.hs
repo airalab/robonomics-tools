@@ -39,8 +39,10 @@ instance Hashable Base58String where
     hash = hash . toBytes
     hashWithSalt x = hashWithSalt x . hash
 
-matchOrders :: MonadLogger m => Pipe Msg (Demand, Offer) m ()
-matchOrders = go mempty mempty
+type MatchResponse = Either Msg (Demand, Offer)
+
+matcher :: MonadLogger m => Pipe Msg MatchResponse m ()
+matcher = go mempty mempty
   where
     toKey = \case
         MkDemand Demand{..} -> hash demandModel `hashWithSalt` demandObjective
@@ -65,16 +67,19 @@ matchOrders = go mempty mempty
         case msg of
           MkDemand ask ->
               case bids !? key of
-                  Nothing -> go (insert key ask asks) bids
-                  Just bid -> do yield (ask, bid)
+                  Nothing  -> do yield $ Left msg
+                                 go (insert key ask asks) bids
+                  Just bid -> do yield $ Right (ask, bid)
                                  lift $ $logInfo $ "Matched: " <> T.pack (show (ask, bid))
                                  go asks (delete key bids)
 
           MkOffer bid ->
               case asks !? key of
-                    Nothing -> go asks (insert key bid bids)
-                    Just ask -> do yield (ask, bid)
+                    Nothing  -> do yield $ Left msg
+                                   go asks (insert key bid bids)
+                    Just ask -> do yield $ Right (ask, bid)
                                    lift $ $logInfo $ "Matched: " <> T.pack (show (ask, bid))
                                    go (delete key asks) bids
 
-          _ -> go asks bids
+          _ -> do yield $ Left msg
+                  go asks bids

@@ -10,7 +10,7 @@ import           Control.Concurrent                          (newChan, readChan,
                                                               writeChan)
 import           Control.Concurrent.Async                    (async)
 import           Control.Monad                               (forever, void,
-                                                              when)
+                                                              when, (<=<))
 import           Control.Monad.Catch                         (MonadCatch,
                                                               catchAll)
 import           Control.Monad.Fail                          (MonadFail)
@@ -27,6 +27,7 @@ import           Control.Monad.Trans.Control                 (MonadBaseControl)
 import           Crypto.Ethereum                             (PrivateKey)
 import           Crypto.Ethereum.Utils                       (derivePubKey)
 import           Crypto.Random                               (MonadRandom (..))
+import qualified Data.ByteArray                              as BA (convert)
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString.Char8                       as C8 (pack)
 import           Data.Default                                (def)
@@ -44,7 +45,8 @@ import           Network.Ethereum.Api.Provider               (Provider,
 import           Network.Ethereum.Api.Types                  (DefaultBlock (Latest),
                                                               Filter (..),
                                                               changeTopics,
-                                                              receiptLogs)
+                                                              receiptLogs,
+                                                              receiptTransactionHash)
 import           Network.Ethereum.Ens                        (namehash)
 import qualified Network.Ethereum.Ens.PublicResolver         as Resolver
 import qualified Network.Ethereum.Ens.Registry               as Reg
@@ -57,8 +59,8 @@ import           Pipes                                       (await, for,
 import qualified Network.Robonomics.Contract.Factory         as Factory
 import qualified Network.Robonomics.Contract.Lighthouse      as Lighthouse
 import qualified Network.Robonomics.Contract.XRT             as XRT
-import           Network.Robonomics.InfoChan                 (subscribe)
-import           Network.Robonomics.InfoChan                 (Msg (MkReport))
+import           Network.Robonomics.InfoChan                 (Msg (..), publish,
+                                                              subscribe)
 import           Network.Robonomics.Liability                (Liability (..))
 import qualified Network.Robonomics.Liability                as Liability (create,
                                                                            finalize,
@@ -66,7 +68,11 @@ import qualified Network.Robonomics.Liability                as Liability (creat
                                                                            read)
 import           Network.Robonomics.Liability.Generator      (randomDeal,
                                                               randomReport)
-import           Network.Robonomics.Lighthouse.SimpleMatcher (matchOrders)
+import           Network.Robonomics.Lighthouse.SimpleMatcher (matcher)
+import           Network.Robonomics.Message                  (Accepted (..),
+                                                              Pending (..),
+                                                              Report (..),
+                                                              RobonomicsMsg (..))
 
 instance MonadRandom (LoggingT (ReaderT r Web3)) where
     getRandomBytes = liftIO . getRandomBytes
@@ -93,6 +99,10 @@ local cfg@Config{..} =
         $logInfo $ "Account address: " <> T.pack (show accountAddress)
 
         let web3 = runWeb3' web3Provider . withAccount web3Account
+            gasprice = 5 :: Shannon
+            create = Liability.create lighthouseAddress gasprice
+            finalize = Liability.finalize lighthouseAddress gasprice
+
         res <- web3 $ resolve ens $ C8.pack factoryName
         case res of
             Left _ -> do
@@ -104,11 +114,11 @@ local cfg@Config{..} =
                     $logInfo $ "Account nonce: "<> T.pack (show nonce)
 
                     deal <- randomDeal lighthouseAddress nonce key
-                    Right receipt <- web3 $ Liability.create lighthouseAddress deal
+                    Right receipt <- web3 $ create deal
                     let Right liabilityAddress = decode (changeTopics (receiptLogs receipt !! 2) !! 1)
 
                     report <- randomReport liabilityAddress key
-                    web3 $ Liability.finalize lighthouseAddress report
+                    web3 $ finalize report
 
 ipfs :: ( MonadBaseControl IO m
         , MonadIO m
@@ -122,23 +132,49 @@ ipfs cfg@Config{..} =
         $logInfo "Starting IPFS provider..."
         $logInfo $ "Account address: " <> T.pack (show accountAddress)
 
-        let asyncWeb3 = runWeb3' web3Provider . forkWeb3 . withAccount web3Account
-            runSafe = flip catchAll ($logError . T.pack . show) . void
+        let web3 = runWeb3' web3Provider . withAccount web3Account
+            runSafe = flip catchAll (const (return (Left undefined)) <=< $logError . T.pack . show)
+            gasprice = 5 :: Shannon
 
-            create   = lift . runSafe . asyncWeb3 . Liability.create lighthouseAddress
-            finalize = lift . runSafe . asyncWeb3 . Liability.finalize lighthouseAddress
+            create   = lift . runSafe . web3 . fmap Just . Liability.create lighthouseAddress gasprice
+            finalize = lift . runSafe . web3 . fmap Just . Liability.finalize lighthouseAddress gasprice
 
-            dispatchReport = forever $ do
+            dispatcher = forever $ do
                 msg <- await
                 case msg of
-                  MkReport report -> finalize report
-                  _               -> yield msg
+                    Right deal@(demand, offer) -> do
+                        mbtx <- create deal
+                        case mbtx of
+                            Right (Just receipt) ->
+                                let txHash = BA.convert (receiptTransactionHash receipt)
+                                 in yield . MkPending $ Pending txHash
+                            _ -> return ()
 
-            orders = subscribe ipfsProvider lighthouseName
-                  >-> dispatchReport
-                  >-> matchOrders
+                    Left (MkReport report@Report{..}) -> do
+                        mbtx <- finalize report
+                        case mbtx of
+                            Right (Just receipt) ->
+                                let txHash = BA.convert (receiptTransactionHash receipt)
+                                 in yield . MkPending $ Pending txHash
+                            _ -> return ()
 
-        runEffect $ for orders create
+                    Left (MkDemand demand) ->
+                        let feedback = Accepted (BA.convert $ hash demand) 0 ""
+                         in yield . MkAccepted $ feedback { acceptedSignature = sign key feedback }
+
+                    Left (MkOffer offer) ->
+                        let feedback = Accepted (BA.convert $ hash offer) 0 ""
+                         in yield . MkAccepted $ feedback { acceptedSignature = sign key feedback }
+
+                    _ -> return ()
+
+            pipeline = subscribe ipfsProvider lighthouseName
+                   >-> matcher
+                   >-> dispatcher
+                   >-> publish ipfsProvider lighthouseName
+
+        runEffect pipeline
+  where LocalKey key _ = web3Account
 
 connectLighthouse :: (MonadIO m, MonadLogger m)
                   => Config

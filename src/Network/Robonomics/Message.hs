@@ -12,13 +12,15 @@ module Network.Robonomics.Message
   , Demand(..)
   , Offer(..)
   , Report(..)
+  , Accepted(..)
+  , Pending(..)
   ) where
 
 import           Crypto.Ethereum           (PrivateKey, signMessage)
 import           Crypto.Hash               (Digest, Keccak_256)
 import qualified Crypto.Hash               as Crypto
-import           Data.Aeson                (FromJSON (..), ToJSON (..),
-                                            withObject, (.:))
+import           Data.Aeson                (FromJSON (..), ToJSON (..), object,
+                                            withObject, (.:), (.=))
 import           Data.Base58String.Bitcoin (Base58String, toBytes)
 import qualified Data.ByteArray            as BA (convert, drop)
 import           Data.ByteArray.Encoding   (Base (Base16), convertFromBase)
@@ -115,6 +117,20 @@ instance FromJSON Demand where
         <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
+instance ToJSON Demand where
+    toJSON Demand{..} = object
+        [ "model" .= demandModel
+        , "objective" .= demandObjective
+        , "token" .= demandToken
+        , "cost" .= demandCost
+        , "lighthouse" .= demandLighthouse
+        , "validator" .= demandValidator
+        , "validatorFee" .= demandValidatorFee
+        , "deadline" .= demandDeadline
+        , "sender" .= demandSender
+        , "signature" .= (BA.convert demandSignature :: HexString)
+        ]
+
 data Offer = Offer
     { offerModel         :: !Base58String
     , offerObjective     :: !Base58String
@@ -164,6 +180,20 @@ instance FromJSON Offer where
         <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
+instance ToJSON Offer where
+    toJSON Offer{..} = object
+        [ "model" .= offerModel
+        , "objective" .= offerObjective
+        , "token" .= offerToken
+        , "cost" .= offerCost
+        , "validator" .= offerValidator
+        , "lighthouse" .= offerLighthouse
+        , "lighthouseFee" .= offerLighthouseFee
+        , "deadline" .= offerDeadline
+        , "sender" .= offerSender
+        , "signature" .= (BA.convert offerSignature :: HexString)
+        ]
+
 data Report = Report
   { reportLiability :: !Address
   , reportResult    :: !Base58String
@@ -190,6 +220,61 @@ instance FromJSON Report where
         <*> v .: "result"
         <*> v .: "success"
         <*> (b16decode =<< v .: "signature")
+
+instance ToJSON Report where
+    toJSON Report{..} = object
+        [ "liability" .= reportLiability
+        , "result" .= reportResult
+        , "success" .= reportSuccess
+        , "signature" .= (BA.convert reportSignature :: HexString)
+        ]
+
+data Accepted = Accepted
+  { acceptedOrderHash :: !Bytes
+  , acceptedTime      :: !(UIntN 256)
+  , acceptedSignature :: !Bytes
+  } deriving (Eq, GHC.Generic)
+
+instance Show Accepted where
+    show Accepted{..} =
+        C8.unpack $ C8.concat $ C8.cons ' ' <$>
+            [ C8.pack (show acceptedOrderHash)
+            , C8.pack (show acceptedTime)
+            , C8.pack (show (BA.convert acceptedSignature :: HexString))
+            ]
+
+instance Generic Accepted
+instance RobonomicsMsg Accepted where
+    hash = acceptedHash
+
+instance FromJSON Accepted where
+    parseJSON = withObject "Accepted" $ \v -> Accepted
+        <$> v .: "order"
+        <*> v .: "accepted"
+        <*> (b16decode =<< v .: "signature")
+
+instance ToJSON Accepted where
+    toJSON Accepted{..} = object
+        [ "order" .= acceptedOrderHash
+        , "accepted" .= acceptedTime
+        , "signature" .= (BA.convert acceptedSignature :: HexString)
+        ]
+
+newtype Pending = Pending
+  { pendingTransaction :: Bytes
+  } deriving(Eq, GHC.Generic)
+
+instance Show Pending where
+    show Pending{..} = show (BA.convert pendingTransaction :: HexString)
+
+instance Generic Pending
+instance FromJSON Pending where
+    parseJSON = withObject "Pending" $ \v -> Pending
+        <$> (b16decode =<< v .: "tx")
+
+instance ToJSON Pending where
+    toJSON Pending{..} = object
+        [ "tx" .= (BA.convert pendingTransaction :: HexString) ]
 
 demandHash :: Demand -> Digest Keccak_256
 {-# INLINE demandHash #-}
@@ -225,6 +310,16 @@ reportHash Report{..} =
     Crypto.hash $ BA.drop 12 (encode reportLiability)
                <> toBytes reportResult
                <> BA.drop 31 (encode reportSuccess)
+
+acceptedHash :: Accepted -> Digest Keccak_256
+{-# INLINE acceptedHash #-}
+acceptedHash Accepted{..} =
+    Crypto.hash $ acceptedOrderHash
+               <> encode acceptedTime
+
+pendingHash :: Pending -> Digest Keccak_256
+{-# INLINE pendingHash #-}
+pendingHash Pending{..} = Crypto.hash pendingTransaction
 
 b16decode :: Monad m => Text -> m Bytes
 b16decode = either fail return . convertFromBase Base16 . encodeUtf8

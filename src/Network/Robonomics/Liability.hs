@@ -88,28 +88,30 @@ list factory from to f = do
         return ContinueEvent
 
 -- | Create liability smart contract for given demand/offer pair
-create :: JsonRpc m
+create :: (JsonRpc m, Unit gasPrice)
        => Address
        -- ^ Lighthouse address
+       -> gasPrice
+       -- ^ Gas price
        -> (Demand, Offer)
        -- ^ Matched deal
        -> LocalKeyAccount m TxReceipt
-create lighthouse (demand, offer) =
+create lighthouse price (demand, offer) =
     withParam (to .~ lighthouse) $
-        withParam (gasPrice .~ (5 :: Shannon)) $
-            safeSend safeConfirmations $
-                F.CreateLiabilityData (encode' demand) (encode' offer)
+        withParam (gasPrice .~ price) $
+            F.createLiability (encode' demand) (encode' offer)
 
 -- | Finalize liability for given signed report
-finalize :: JsonRpc m
+finalize :: (JsonRpc m, Unit gasPrice)
          => Address
          -- ^ Lighthouse address
+         -> gasPrice
+         -- ^ Gas price
          -> Report
          -- ^ Liability report
          -> LocalKeyAccount m TxReceipt
-finalize lighthouse Report{..} =
+finalize lighthouse price Report{..} =
     withParam (to .~ lighthouse) $
-        withParam (gasPrice .~ (5 :: Shannon)) $
-            safeSend safeConfirmations $
-                Lighthouse.FinalizeLiabilityData reportLiability resultBytes reportSuccess reportSignature
+        withParam (gasPrice .~ price) $
+            Lighthouse.finalizeLiability reportLiability resultBytes reportSuccess reportSignature
   where resultBytes = convert (toBytes reportResult)
