@@ -1,5 +1,10 @@
 # Changelog for robonomics-tools
 
+## [0.5.2.0] 2019-07-24
+### Added
+- Lighthouse feedbacks for IPFS channels
+- xrtd: "gasprice" option
+
 ## [0.5.1.0] 2019-06-01
 ### Added
 - ipfs-subscriber: start lighthouse scan block parameter

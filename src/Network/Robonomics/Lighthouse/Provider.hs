@@ -84,6 +84,7 @@ data Config = Config
     , lighthouseName :: !String
     , factoryName    :: !String
     , ens            :: !Address
+    , gasprice       :: !Szabo
     } deriving (Eq, Show)
 
 local :: ( MonadIO m
@@ -99,7 +100,6 @@ local cfg@Config{..} =
         $logInfo $ "Account address: " <> T.pack (show accountAddress)
 
         let web3 = runWeb3' web3Provider . withAccount web3Account
-            gasprice = 5 :: Shannon
             create = Liability.create lighthouseAddress gasprice
             finalize = Liability.finalize lighthouseAddress gasprice
 
@@ -134,7 +134,6 @@ ipfs cfg@Config{..} =
 
         let web3 = runWeb3' web3Provider . withAccount web3Account
             runSafe = flip catchAll (const (return (Left undefined)) <=< $logError . T.pack . show)
-            gasprice = 5 :: Shannon
 
             create   = lift . runSafe . web3 . fmap Just . Liability.create lighthouseAddress gasprice
             finalize = lift . runSafe . web3 . fmap Just . Liability.finalize lighthouseAddress gasprice

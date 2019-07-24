@@ -7,6 +7,7 @@ import           Data.ByteArray.HexString               (HexString)
 import           Network.Ethereum.Account.LocalKey      (LocalKey (..))
 import           Network.Ethereum.Api.Provider          (Provider (..))
 import           Network.Ethereum.Chain
+import           Network.Ethereum.Unit                  (Szabo)
 import           Options.Applicative
 
 import qualified Network.Robonomics.Lighthouse.Provider as P
@@ -32,6 +33,7 @@ providerOptions = P.Config
     <*> option str (long "lighthouse" <> value "airalab.lighthouse.5.robonomics.eth" <> metavar "ENS" <> help "Robonomics lighthouse name")
     <*> option str (long "factory" <> value "factory.5.robonomics.eth" <> metavar "ENS" <> help "Robonomics liability factory name")
     <*> option str (long "ens" <> value "0x314159265dD8dbb310642f98f50C066173C1259b" <> metavar "ADDRESS" <> help "ENS registry contract")
+    <*> option auto (long "gasprice" <> value (5 :: Szabo) <> metavar "GAS_PRICE" <> help "Transaction gas price, GWei [DEFAULT: 5]")
 
 account :: Parser LocalKey
 account = LocalKey . (importKey :: HexString -> PrivateKey)
