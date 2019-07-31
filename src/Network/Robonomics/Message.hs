@@ -29,7 +29,6 @@ import           Data.ByteArray.Sized      (unsafeSizedByteArray)
 import           Data.ByteString           (ByteString)
 import qualified Data.ByteString.Char8     as C8 (concat, cons, pack, unpack)
 import qualified Data.ByteString.Short     as Short (fromShort, pack)
-import           Data.Maybe                (fromJust)
 import           Data.Monoid               ((<>))
 import           Data.Proxy                (Proxy (..))
 import           Data.Solidity.Abi         (AbiPut (..), AbiType (..))
@@ -77,7 +76,7 @@ data Demand = Demand
     , demandValidator    :: !Address
     , demandValidatorFee :: !(UIntN 256)
     , demandDeadline     :: !(UIntN 256)
-    , demandNonce        :: !(Maybe (UIntN 256))
+    , demandNonce        :: !(UIntN 256)
     , demandSender       :: !Address
     , demandSignature    :: !Bytes
     }
@@ -113,7 +112,7 @@ instance FromJSON Demand where
         <*> v .: "validator"
         <*> v .: "validatorFee"
         <*> v .: "deadline"
-        <*> pure Nothing
+        <*> v .: "nonce"
         <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
@@ -127,6 +126,7 @@ instance ToJSON Demand where
         , "validator" .= demandValidator
         , "validatorFee" .= demandValidatorFee
         , "deadline" .= demandDeadline
+        , "nonce" .= demandNonce
         , "sender" .= demandSender
         , "signature" .= (BA.convert demandSignature :: HexString)
         ]
@@ -140,7 +140,7 @@ data Offer = Offer
     , offerLighthouse    :: !Address
     , offerLighthouseFee :: !(UIntN 256)
     , offerDeadline      :: !(UIntN 256)
-    , offerNonce         :: !(Maybe (UIntN 256))
+    , offerNonce         :: !(UIntN 256)
     , offerSender        :: !Address
     , offerSignature     :: !Bytes
     }
@@ -176,7 +176,7 @@ instance FromJSON Offer where
         <*> v .: "lighthouse"
         <*> v .: "lighthouseFee"
         <*> v .: "deadline"
-        <*> pure Nothing
+        <*> v .: "nonce"
         <*> v .: "sender"
         <*> (b16decode =<< v .: "signature")
 
@@ -190,6 +190,7 @@ instance ToJSON Offer where
         , "lighthouse" .= offerLighthouse
         , "lighthouseFee" .= offerLighthouseFee
         , "deadline" .= offerDeadline
+        , "nonce" .= offerNonce
         , "sender" .= offerSender
         , "signature" .= (BA.convert offerSignature :: HexString)
         ]
@@ -287,7 +288,7 @@ demandHash Demand{..} =
                <> BA.drop 12 (encode demandValidator)
                <> encode demandValidatorFee
                <> encode demandDeadline
-               <> encode (fromJust demandNonce)
+               <> encode demandNonce
                <> BA.drop 12 (encode demandSender)
 
 offerHash :: Offer -> Digest Keccak_256
@@ -301,7 +302,7 @@ offerHash Offer{..} =
                <> BA.drop 12 (encode offerLighthouse)
                <> encode offerLighthouseFee
                <> encode offerDeadline
-               <> encode (fromJust offerNonce)
+               <> encode offerNonce
                <> BA.drop 12 (encode offerSender)
 
 reportHash :: Report -> Digest Keccak_256

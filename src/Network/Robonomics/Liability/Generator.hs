@@ -53,7 +53,7 @@ randDemand lighthouse nonce sender =
            <*> pure "0x0000000000000000000000000000000000000000"
            <*> pure 0
            <*> pure (2 ^ 100)
-           <*> pure (Just nonce)
+           <*> pure nonce
            <*> pure sender
            <*> pure mempty
 
@@ -67,7 +67,7 @@ pairOffer Demand{..} =
           demandLighthouse
           0
           demandDeadline
-          (fmap (+ 1) demandNonce)
+          (demandNonce + 1)
           demandSender
           mempty
 
@@ -91,8 +91,8 @@ randomDeal lighthouse nonce key = do
     let offer = pairOffer demand
     $logDebug $ "Associated Offer message: " <> T.pack (show offer)
 
-    let signed = ( demand { demandSignature = sign key demand, demandNonce = Nothing }
-                 , offer { offerSignature = sign key offer, offerNonce = Nothing } )
+    let signed = ( demand { demandSignature = sign key demand }
+                 , offer { offerSignature = sign key offer } )
     $logInfo $ "The deal was generated: " <> T.pack (show signed)
 
     return signed

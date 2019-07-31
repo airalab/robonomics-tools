@@ -4,7 +4,7 @@
 :toc:
 :sectnums:
 
-image:https://travis-ci.org/airalab/substrate-node-robonomics.svg?branch=master["Build Status", link="https://travis-ci.org/airalab/robonomics-tools"]
+image:https://travis-ci.org/airalab/robonomics-tools.svg?branch=master["Build Status", link="https://travis-ci.org/airalab/robonomics-tools"]
 
 == Intro
 
