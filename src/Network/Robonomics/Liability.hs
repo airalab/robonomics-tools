@@ -9,7 +9,7 @@ import           Data.ByteArray                         (convert)
 import qualified Data.ByteString.Char8                  as C8
 import           Data.Default                           (def)
 import           Data.Proxy                             (Proxy (..))
-import           Data.Solidity.Abi.Codec                (encode, encode')
+import           Data.Solidity.Abi.Codec                as ABI (encode)
 import           Lens.Micro                             ((.~))
 import           Network.Ethereum.Account.Safe          (safeConfirmations,
                                                          safeSend)
@@ -99,7 +99,7 @@ create :: (JsonRpc m, Unit gasPrice)
 create lighthouse price (demand, offer) =
     withParam (to .~ lighthouse) $
         withParam (gasPrice .~ price) $
-            F.createLiability (encode' demand) (encode' offer)
+            F.createLiability (ABI.encode demand) (ABI.encode offer)
 
 -- | Finalize liability for given signed report
 finalize :: (JsonRpc m, Unit gasPrice)

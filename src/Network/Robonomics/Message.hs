@@ -47,13 +47,6 @@ instance (KnownNat n, n <= 256) => FromJSON (UIntN n) where
 instance (KnownNat n, n <= 256) => ToJSON (UIntN n) where
     toJSON = toJSON . toInteger
 
-instance AbiType a => AbiType (Maybe a) where
-    isDynamic _ = isDynamic (Proxy :: Proxy a)
-
-instance AbiPut a => AbiPut (Maybe a) where
-    abiPut Nothing  = pure ()
-    abiPut (Just a) = abiPut a
-
 instance AbiType Base58String where
     isDynamic _ = True
 
@@ -131,6 +124,22 @@ instance ToJSON Demand where
         , "signature" .= (BA.convert demandSignature :: HexString)
         ]
 
+instance AbiType Demand where
+    isDynamic _ = False
+
+instance AbiPut Demand where
+    abiPut Demand{..} = do
+        abiPut demandModel
+        abiPut demandObjective
+        abiPut demandToken
+        abiPut demandCost
+        abiPut demandLighthouse
+        abiPut demandValidator
+        abiPut demandValidatorFee
+        abiPut demandDeadline
+        abiPut demandSender
+        abiPut demandSignature
+
 data Offer = Offer
     { offerModel         :: !Base58String
     , offerObjective     :: !Base58String
@@ -194,6 +203,22 @@ instance ToJSON Offer where
         , "sender" .= offerSender
         , "signature" .= (BA.convert offerSignature :: HexString)
         ]
+
+instance AbiType Offer where
+    isDynamic _ = False
+
+instance AbiPut Offer where
+    abiPut Offer{..} = do
+        abiPut offerModel
+        abiPut offerObjective
+        abiPut offerToken
+        abiPut offerCost
+        abiPut offerValidator
+        abiPut offerLighthouse
+        abiPut offerLighthouseFee
+        abiPut offerDeadline
+        abiPut offerSender
+        abiPut offerSignature
 
 data Report = Report
   { reportLiability :: !Address
