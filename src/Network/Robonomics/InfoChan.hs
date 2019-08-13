@@ -4,7 +4,7 @@ module Network.Robonomics.InfoChan where
 
 import           Control.Applicative        ((<|>))
 import           Control.Monad.IO.Class     (MonadIO)
-import           Control.Monad.Logger       (MonadLogger, logError)
+import           Control.Monad.Logger       (MonadLogger, logWarn)
 import           Control.Monad.Trans        (lift)
 import           Data.Aeson                 (ToJSON (..), Value, eitherDecode,
                                              encode, parseJSON)
@@ -36,11 +36,9 @@ instance ToJSON Msg where
 
 parseMsg :: Value -> Either String Msg
 parseMsg = parseEither $
-    \msg -> MkDemand   <$> parseJSON msg
-        <|> MkOffer    <$> parseJSON msg
-        <|> MkReport   <$> parseJSON msg
-        <|> MkAccepted <$> parseJSON msg
-        <|> MkPending  <$> parseJSON msg
+    \msg -> MkDemand <$> parseJSON msg
+        <|> MkOffer  <$> parseJSON msg
+        <|> MkReport <$> parseJSON msg
 
 subscribe :: (MonadIO m, MonadLogger m)
           => String
@@ -52,7 +50,7 @@ subscribe api = PubSub.subscribe api ~> parser
   where
     parser msg = case parseMsg =<< eitherDecode (fromStrict msg) of
         Right msg -> yield msg
-        Left e    -> lift ($logError $ T.pack e)
+        Left e    -> lift ($logWarn ("Unable to parse msg: " <> T.pack (show msg) <> " : " <> T.pack e))
 
 publish :: (MonadIO m, MonadLogger m, ToJSON msg)
         => String
