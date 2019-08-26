@@ -95,6 +95,16 @@ PubSub and create new liability when messages matched.
 [source, shell]
 xrtd --private $PRIVATE_KEY
 
+=== Troubleshooting
+
+. `Error: cannot connect to the api. Is the deamon running?`
+[source, shell]
+ipfs init
+
+. `xrtd: fd:16: Data.ByteString.hGetLine: end of file`
+[source, shell]
+ipfs daemon --enable-pubsub-experiment
+
 == Liability explorer
 
 Using `liability` command robot liabilities could be listed.
