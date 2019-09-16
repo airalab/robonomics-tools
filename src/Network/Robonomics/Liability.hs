@@ -4,7 +4,9 @@ module Network.Robonomics.Liability where
 
 import           Control.Monad.Reader                   (asks)
 import           Control.Monad.Trans                    (lift)
-import           Data.Base58String.Bitcoin              (toBytes)
+import           Data.Base58String.Bitcoin              (Base58String,
+                                                         fromBytes, toBytes,
+                                                         toText)
 import           Data.ByteArray                         (convert)
 import qualified Data.ByteString.Char8                  as C8
 import           Data.Default                           (def)
@@ -29,25 +31,27 @@ import           Network.Robonomics.Message             (Demand, Offer,
                                                          Report (..))
 
 data Liability = Liability
-    { liabilityModel      :: Bytes
-    , liabilityObjective  :: Bytes
-    , liabilityLighthouse :: Address
-    , liabilityPromisee   :: Address
-    , liabilityPromisor   :: Address
-    , liabilityToken      :: Address
-    , liabilityCost       :: Integer
+    { liabilityModel      :: !Base58String
+    , liabilityObjective  :: !Base58String
+    , liabilityLighthouse :: !Address
+    , liabilityPromisee   :: !Address
+    , liabilityPromisor   :: !Address
+    , liabilityToken      :: !Address
+    , liabilityCost       :: !Integer
+    , liabilityResult     :: !Base58String
     } deriving Eq
 
 instance Show Liability where
     show Liability{..} = ("Liability" ++) $
         C8.unpack $ C8.concat $ C8.cons ' ' <$>
-            [ C8.pack (show liabilityModel)
-            , C8.pack (show liabilityObjective)
+            [ C8.pack (show $ toText liabilityModel)
+            , C8.pack (show $ toText liabilityObjective)
             , C8.pack (show liabilityLighthouse)
             , C8.pack (show liabilityPromisee)
             , C8.pack (show liabilityPromisor)
             , C8.pack (show liabilityToken)
             , C8.pack (show liabilityCost)
+            , C8.pack (show $ toText liabilityResult)
             ]
 
 -- | Read liability from blockchain by address
@@ -56,13 +60,15 @@ read :: JsonRpc m
      -- ^ Liability address
      -> LocalKeyAccount m Liability
 read a = withParam (to .~ a) $
-    Liability <$> L.model
-              <*> L.objective
+    Liability <$> toB58 L.model
+              <*> toB58 L.objective
               <*> L.lighthouse
               <*> L.promisee
               <*> L.promisor
               <*> L.token
               <*> (fromIntegral <$> L.cost)
+              <*> toB58 L.result
+  where toB58 = fmap (fromBytes . convert)
 
 -- | All liabilities created in given block range
 list :: Address
