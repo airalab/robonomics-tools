@@ -1,5 +1,9 @@
 # Changelog for robonomics-tools
 
+## [0.5.3.0] 2019-09-16
+### Changed
+- Bug fixes and minor improvements
+
 ## [0.5.2.0] 2019-07-24
 ### Added
 - Lighthouse feedbacks for IPFS channels
