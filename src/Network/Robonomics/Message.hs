@@ -22,19 +22,20 @@ import qualified Crypto.Hash               as Crypto
 import           Data.Aeson                (FromJSON (..), ToJSON (..), object,
                                             withObject, (.:), (.=))
 import           Data.Base58String.Bitcoin (Base58String, toBytes)
+import           Data.ByteArray            (ByteArrayAccess)
 import qualified Data.ByteArray            as BA (convert, drop)
 import           Data.ByteArray.Encoding   (Base (Base16), convertFromBase)
-import           Data.ByteArray.HexString  (HexString)
+import           Data.ByteArray.HexString  (HexString, fromBytes)
 import           Data.ByteArray.Sized      (unsafeSizedByteArray)
 import           Data.ByteString           (ByteString)
 import qualified Data.ByteString.Char8     as C8 (concat, cons, pack, unpack)
 import qualified Data.ByteString.Short     as Short (fromShort, pack)
+import           Data.Hashable             (Hashable (hashWithSalt))
 import           Data.Monoid               ((<>))
 import           Data.Proxy                (Proxy (..))
 import           Data.Solidity.Abi         (AbiPut (..), AbiType (..))
 import           Data.Solidity.Abi.Codec   (encode)
 import           Data.Solidity.Prim        (Address, Bytes, BytesN, UIntN)
-import           Data.String.Extra         (toLowerFirst)
 import           Data.Text                 (Text)
 import           Data.Text.Encoding        (encodeUtf8)
 import           Generics.SOP              (Generic)
@@ -140,6 +141,10 @@ instance AbiPut Demand where
         abiPut demandSender
         abiPut demandSignature
 
+instance Hashable Demand where
+    hashWithSalt = flip (flip hashWithSalt . bs . demandHash)
+      where bs = BA.convert :: ByteArrayAccess ba => ba -> ByteString
+
 data Offer = Offer
     { offerModel         :: !Base58String
     , offerObjective     :: !Base58String
@@ -220,6 +225,10 @@ instance AbiPut Offer where
         abiPut offerSender
         abiPut offerSignature
 
+instance Hashable Offer where
+    hashWithSalt = flip (flip hashWithSalt . bs . offerHash)
+      where bs = BA.convert :: ByteArrayAccess ba => ba -> ByteString
+
 data Report = Report
   { reportLiability :: !Address
   , reportResult    :: !Base58String
@@ -255,6 +264,10 @@ instance ToJSON Report where
         , "signature" .= (BA.convert reportSignature :: HexString)
         ]
 
+instance Hashable Report where
+    hashWithSalt = flip (flip hashWithSalt . bs . reportHash)
+      where bs = BA.convert :: ByteArrayAccess ba => ba -> ByteString
+
 data Accepted = Accepted
   { acceptedOrderHash :: !Bytes
   , acceptedTime      :: !(UIntN 256)
@@ -286,6 +299,10 @@ instance ToJSON Accepted where
         , "signature" .= (BA.convert acceptedSignature :: HexString)
         ]
 
+instance Hashable Accepted where
+    hashWithSalt = flip (flip hashWithSalt . bs . acceptedHash)
+      where bs = BA.convert :: ByteArrayAccess ba => ba -> ByteString
+
 newtype Pending = Pending
   { pendingTransaction :: Bytes
   } deriving(Eq, GHC.Generic)
@@ -301,6 +318,10 @@ instance FromJSON Pending where
 instance ToJSON Pending where
     toJSON Pending{..} = object
         [ "tx" .= (BA.convert pendingTransaction :: HexString) ]
+
+instance Hashable Pending where
+    hashWithSalt = flip (flip hashWithSalt . bs . pendingHash)
+      where bs = BA.convert :: ByteArrayAccess ba => ba -> ByteString
 
 demandHash :: Demand -> Digest Keccak_256
 {-# INLINE demandHash #-}
