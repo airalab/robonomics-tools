@@ -98,6 +98,7 @@ local cfg@Config{..} =
     connectLighthouse cfg $ \key accountAddress lighthouseAddress -> do
         $logInfo "Starting local miner..."
         $logInfo $ "Account address: " <> T.pack (show accountAddress)
+        $logInfo $ "Gas price: " <> T.pack (show gasprice)
 
         let web3 = runWeb3' web3Provider . withAccount web3Account
             create = Liability.create lighthouseAddress gasprice
@@ -131,6 +132,7 @@ ipfs cfg@Config{..} =
     connectLighthouse cfg $ \_ accountAddress lighthouseAddress -> do
         $logInfo "Starting IPFS provider..."
         $logInfo $ "Account address: " <> T.pack (show accountAddress)
+        $logInfo $ "Gas price: " <> T.pack (show gasprice)
 
         let web3 = runWeb3' web3Provider . withAccount web3Account
             runSafe = flip catchAll (const (return (Left undefined)) <=< $logError . T.pack . show)
