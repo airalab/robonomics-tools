@@ -174,8 +174,6 @@ local cfg@Config{..} =
                         create = runSafe . web3 . Liability.create lighthouseAddress price
 
                     deal <- randomDeal lighthouseAddress nonce key
-                    -- $logDebug $ T.pack $ show (encode (fst deal) :: HexString)
-                    -- $logDebug $ T.pack $ show (encode (snd deal) :: HexString)
                     Right receipt <- create deal
                     let Right liabilityAddress = decode (changeTopics (receiptLogs receipt !! 2) !! 1)
 

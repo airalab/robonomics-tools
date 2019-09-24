@@ -1,5 +1,5 @@
 sudo: false 
-language: nix 
+language: cpp
 
 # Caching so the next build will be fast too.
 cache:
@@ -7,5 +7,39 @@ cache:
   - $HOME/.stack
   - $TRAVIS_BUILD_DIR/.stack-work
 
+# The different configurations we want to test.
+matrix:
+  # Build with different GHC versions and stable package sets
+  include:
+  - env: RESOLVER=lts-13
+    compiler: "LTS13"
+  - env: RESOLVER=lts-14
+    compiler: "LTS14"
+  - env: RESOLVER=nightly
+    compiler: "nightly"
+
+  - env: RESOLVER=lts-13
+    compiler: "LTS13"
+    os: osx
+  - env: RESOLVER=lts-14
+    compiler: "LTS14"
+    os: osx
+  - env: RESOLVER=nightly
+    compiler: "nightly"
+    os: osx
+
+  - env: RESOLVER=lts-13
+    compiler: "LTS13"
+    os: windows
+  - env: RESOLVER=lts-14
+    compiler: "LTS14"
+    os: windows
+  - env: RESOLVER=nightly
+    compiler: "nightly"
+    os: windows
+
+install:
+- if [[ $TRAVIS_OS_NAME == 'windows' ]]; then choco install haskell-stack; else curl -sSL https://get.haskellstack.org/ | sh; fi
+
 script:
-- nix-shell -p stack --run "stack build --nix"
+- stack build --no-terminal --haddock --no-haddock-deps --resolver $RESOLVER
