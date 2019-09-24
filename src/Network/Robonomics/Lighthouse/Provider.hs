@@ -1,5 +1,7 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -17,6 +19,7 @@ import           Control.Monad.Fail                          (MonadFail)
 import           Control.Monad.IO.Class                      (MonadIO (..))
 import           Control.Monad.Logger                        (LoggingT,
                                                               MonadLogger,
+                                                              logDebug,
                                                               logError, logInfo,
                                                               runChanLoggingT,
                                                               runStderrLoggingT,
@@ -27,11 +30,15 @@ import           Control.Monad.Trans.Control                 (MonadBaseControl)
 import           Crypto.Ethereum                             (PrivateKey)
 import           Crypto.Ethereum.Utils                       (derivePubKey)
 import           Crypto.Random                               (MonadRandom (..))
+import           Data.Aeson                                  (FromJSON (..),
+                                                              withObject, (.:))
 import qualified Data.ByteArray                              as BA (convert)
+import           Data.ByteArray.HexString                    (HexString)
 import           Data.ByteString                             (ByteString)
 import qualified Data.ByteString.Char8                       as C8 (pack)
 import           Data.Default                                (def)
-import           Data.Solidity.Abi.Codec                     (decode)
+import           Data.Maybe                                  (fromJust)
+import           Data.Solidity.Abi.Codec                     (decode, encode)
 import           Data.Solidity.Prim.Address                  (fromPubKey)
 import qualified Data.Text                                   as T
 import           Lens.Micro                                  ((.~))
@@ -51,6 +58,8 @@ import           Network.Ethereum.Ens                        (namehash)
 import qualified Network.Ethereum.Ens.PublicResolver         as Resolver
 import qualified Network.Ethereum.Ens.Registry               as Reg
 import           Network.Ethereum.Web3
+import           Network.HTTP.Simple                         (getResponseBody,
+                                                              httpJSON)
 import           Network.JsonRpc.TinyClient                  (JsonRpc)
 import           Pipes                                       (await, for,
                                                               runEffect, yield,
@@ -77,6 +86,24 @@ import           Network.Robonomics.Message                  (Accepted (..),
 instance MonadRandom (LoggingT (ReaderT r Web3)) where
     getRandomBytes = liftIO . getRandomBytes
 
+data GasPrice where
+    SafePrice :: GasPrice
+    FastPrice :: GasPrice
+    FastestPrice :: GasPrice
+    GasPrice :: Unit gasPrice => gasPrice -> GasPrice
+
+instance Eq GasPrice where
+    SafePrice == SafePrice = True
+    FastPrice == FastPrice = True
+    FastestPrice == FastestPrice = True
+    (GasPrice a) == (GasPrice b) = toWei a == toWei b
+
+instance Show GasPrice where
+    show SafePrice    = "safe"
+    show FastPrice    = "fast"
+    show FastestPrice = "fastest"
+    show (GasPrice p) = show p
+
 data Config = Config
     { web3Provider   :: !Provider
     , web3Account    :: !LocalKey
@@ -84,11 +111,37 @@ data Config = Config
     , lighthouseName :: !String
     , factoryName    :: !String
     , ens            :: !Address
-    , gasprice       :: !Szabo
+    , gasprice       :: !GasPrice
     } deriving (Eq, Show)
+
+data GasStation = GasStation
+    { gasStationSafe    :: Shannon
+    , gasStationFast    :: Shannon
+    , gasStationFastest :: Shannon
+    } deriving (Eq, Ord, Show)
+
+instance FromJSON GasStation where
+    parseJSON = withObject "GasStation" $ \v -> GasStation
+        <$> (toShannon <$> v .: "safeLow")
+        <*> (toShannon <$> v .: "fast")
+        <*> (toShannon <$> v .: "fastest")
+      where
+        toShannon :: Double -> Shannon
+        toShannon = fromWei . round . (* 10**8)
+
+oracleGasPrice :: (MonadIO m, Unit gasPrice) => GasPrice -> m gasPrice
+oracleGasPrice = \case
+    GasPrice p   -> return . fromWei $ toWei p
+    SafePrice    -> convert . gasStationSafe <$> ethGasStation
+    FastPrice    -> convert . gasStationFast <$> ethGasStation
+    FastestPrice -> convert . gasStationFastest <$> ethGasStation
+  where
+    convert = fromWei . toWei
+    ethGasStation = getResponseBody <$> httpJSON "https://ethgasstation.info/json/ethgasAPI.json"
 
 local :: ( MonadIO m
          , MonadFail m
+         , MonadCatch m
          , MonadLogger m
          , MonadRandom m
          )
@@ -100,26 +153,41 @@ local cfg@Config{..} =
         $logInfo $ "Account address: " <> T.pack (show accountAddress)
         $logInfo $ "Gas price: " <> T.pack (show gasprice)
 
-        let web3 = runWeb3' web3Provider . withAccount web3Account
-            create = Liability.create lighthouseAddress gasprice
-            finalize = Liability.finalize lighthouseAddress gasprice
-
-        res <- web3 $ resolve ens $ C8.pack factoryName
+        res <-
+            let web3 = runWeb3' web3Provider . withAccount web3Account
+             in web3 $ resolve ens $ C8.pack factoryName
         case res of
             Left _ -> do
                 $logError $ "Unable to find factory with name " <> T.pack factoryName
                 return ()
 
             Right factoryAddress -> forever $ do
-                    Right nonce <- web3 $ withParam (to .~ factoryAddress) $ Factory.nonceOf accountAddress
-                    $logInfo $ "Account nonce: "<> T.pack (show nonce)
+                    Right nonce <-
+                        let web3 = runWeb3' web3Provider . withAccount web3Account
+                         in web3 $ withParam (to .~ factoryAddress) $ Factory.nonceOf accountAddress
+                    $logInfo $ "Account nonce: " <> T.pack (show nonce)
+
+                    price <- oracleGasPrice gasprice
+                    $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
+                    let runSafe = flip catchAll (const (return $ Left undefined) <=< $logError . T.pack . show)
+                        web3 = runWeb3' web3Provider . withAccount web3Account
+                        create = runSafe . web3 . Liability.create lighthouseAddress price
 
                     deal <- randomDeal lighthouseAddress nonce key
-                    Right receipt <- web3 $ create deal
+                    -- $logDebug $ T.pack $ show (encode (fst deal) :: HexString)
+                    -- $logDebug $ T.pack $ show (encode (snd deal) :: HexString)
+                    Right receipt <- create deal
                     let Right liabilityAddress = decode (changeTopics (receiptLogs receipt !! 2) !! 1)
 
                     report <- randomReport liabilityAddress key
-                    web3 $ finalize report
+
+                    price <- oracleGasPrice gasprice
+                    $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
+                    let runSafe = flip catchAll (const (return $ Left undefined) <=< $logError . T.pack . show)
+                        web3 = runWeb3' web3Provider . withAccount web3Account
+                        finalize = runSafe . web3 . Liability.finalize lighthouseAddress price
+
+                    finalize report
 
 ipfs :: ( MonadBaseControl IO m
         , MonadIO m
@@ -135,29 +203,35 @@ ipfs cfg@Config{..} =
         $logInfo $ "Gas price: " <> T.pack (show gasprice)
 
         let web3 = runWeb3' web3Provider . withAccount web3Account
-            runSafe = flip catchAll (const (return (Left undefined)) <=< $logError . T.pack . show)
-
-            create   = lift . runSafe . web3 . fmap Just . Liability.create lighthouseAddress gasprice
-            finalize = lift . runSafe . web3 . fmap Just . Liability.finalize lighthouseAddress gasprice
+            runSafe = flip catchAll (const (return $ Left undefined) <=< $logError . T.pack . show)
 
             dispatcher = forever $ do
                 msg <- await
                 case msg of
-                    Right deal@(demand, offer) -> do
-                        mbtx <- create deal
-                        case mbtx of
-                            Right (Just receipt) ->
-                                let txHash = BA.convert (receiptTransactionHash receipt)
-                                 in yield . MkPending $ Pending txHash
-                            _ -> return ()
+                    Right deal -> do
 
-                    Left (MkReport report@Report{..}) -> do
-                        mbtx <- finalize report
-                        case mbtx of
-                            Right (Just receipt) ->
+                        price <- oracleGasPrice gasprice
+                        lift $ $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
+                        let create   = lift . runSafe . web3 . Liability.create lighthouseAddress price
+
+                        res <- create deal
+                        case res of
+                            Right receipt -> do
                                 let txHash = BA.convert (receiptTransactionHash receipt)
-                                 in yield . MkPending $ Pending txHash
-                            _ -> return ()
+                                yield . MkPending $ Pending txHash
+                            Left e -> lift . $logError $ T.pack (show e)
+
+                    Left (MkReport report) -> do
+                        price <- oracleGasPrice gasprice
+                        lift $ $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
+                        let finalize = lift . runSafe . web3 . Liability.finalize lighthouseAddress price
+
+                        res <- finalize report
+                        case res of
+                            Right receipt -> do
+                                let txHash = BA.convert (receiptTransactionHash receipt)
+                                yield . MkPending $ Pending txHash
+                            Left e -> lift . $logError $ T.pack (show e)
 
                     Left (MkDemand demand) ->
                         let feedback = Accepted (BA.convert $ hash demand) 0 ""

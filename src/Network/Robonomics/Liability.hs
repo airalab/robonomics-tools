@@ -42,16 +42,16 @@ data Liability = Liability
     } deriving Eq
 
 instance Show Liability where
-    show Liability{..} = ("Liability" ++) $
-        C8.unpack $ C8.concat $ C8.cons ' ' <$>
-            [ C8.pack (show $ toText liabilityModel)
-            , C8.pack (show $ toText liabilityObjective)
-            , C8.pack (show liabilityLighthouse)
-            , C8.pack (show liabilityPromisee)
-            , C8.pack (show liabilityPromisor)
-            , C8.pack (show liabilityToken)
-            , C8.pack (show liabilityCost)
-            , C8.pack (show $ toText liabilityResult)
+    show Liability{..} = mappend "Liability" $
+        C8.unpack $ C8.concat $ (C8.cons ' ' . C8.pack) <$>
+            [ show $ toText liabilityModel
+            , show $ toText liabilityObjective
+            , show liabilityLighthouse
+            , show liabilityPromisee
+            , show liabilityPromisor
+            , show liabilityToken
+            , show liabilityCost
+            , show $ toText liabilityResult
             ]
 
 -- | Read liability from blockchain by address
@@ -120,4 +120,5 @@ finalize lighthouse price Report{..} =
     withParam (to .~ lighthouse) $
         withParam (gasPrice .~ price) $
             Lighthouse.finalizeLiability reportLiability resultBytes reportSuccess reportSignature
-  where resultBytes = convert (toBytes reportResult)
+  where
+    resultBytes = convert (toBytes reportResult)

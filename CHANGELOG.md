@@ -1,5 +1,12 @@
 # Changelog for robonomics-tools
 
+## [0.5.4.0] 2019-09-24
+### Added
+- EthGasStation support in gasprice parameter
+
+### Changed
+- Transaction generation bug fixes
+
 ## [0.5.3.0] 2019-09-16
 ### Changed
 - Bug fixes and minor improvements

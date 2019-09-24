@@ -1,5 +1,5 @@
 name:                robonomics-tools
-version:             0.5.3.0
+version:             0.5.4.0
 github:              "airalab/robonomics-tools"
 license:             BSD3
 author:              "Alexander Krupenkin"
@@ -27,6 +27,7 @@ dependencies:
 - monad-logger
 - data-default
 - generics-sop
+- http-conduit 
 - bytestring
 - cryptonite
 - containers

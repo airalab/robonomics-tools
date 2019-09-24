@@ -48,12 +48,6 @@ instance (KnownNat n, n <= 256) => FromJSON (UIntN n) where
 instance (KnownNat n, n <= 256) => ToJSON (UIntN n) where
     toJSON = toJSON . toInteger
 
-instance AbiType Base58String where
-    isDynamic _ = True
-
-instance AbiPut Base58String where
-    abiPut = abiPut . toBytes
-
 class RobonomicsMsg a where
     hash :: a -> Digest Keccak_256
 
@@ -74,7 +68,7 @@ data Demand = Demand
     , demandSender       :: !Address
     , demandSignature    :: !Bytes
     }
-  deriving (Eq, GHC.Generic)
+  deriving Eq
 
 instance Show Demand where
     show Demand{..} =
@@ -92,7 +86,6 @@ instance Show Demand where
             , C8.pack (show (BA.convert demandSignature :: HexString))
             ]
 
-instance Generic Demand
 instance RobonomicsMsg Demand where
     hash = demandHash
 
@@ -126,20 +119,21 @@ instance ToJSON Demand where
         ]
 
 instance AbiType Demand where
-    isDynamic _ = False
+    isDynamic = const False
 
 instance AbiPut Demand where
-    abiPut Demand{..} = do
-        abiPut demandModel
-        abiPut demandObjective
-        abiPut demandToken
-        abiPut demandCost
-        abiPut demandLighthouse
-        abiPut demandValidator
-        abiPut demandValidatorFee
-        abiPut demandDeadline
-        abiPut demandSender
-        abiPut demandSignature
+    abiPut Demand{..} = abiPut
+        ( toBytes demandModel
+        , toBytes demandObjective
+        , demandToken
+        , demandCost
+        , demandLighthouse
+        , demandValidator
+        , demandValidatorFee
+        , demandDeadline
+        , demandSender
+        , demandSignature
+        )
 
 instance Hashable Demand where
     hashWithSalt = flip (flip hashWithSalt . bs . demandHash)
@@ -158,7 +152,7 @@ data Offer = Offer
     , offerSender        :: !Address
     , offerSignature     :: !Bytes
     }
-  deriving (Eq, GHC.Generic)
+  deriving Eq
 
 instance Show Offer where
     show Offer{..} =
@@ -176,7 +170,6 @@ instance Show Offer where
             , C8.pack (show (BA.convert offerSignature :: HexString))
             ]
 
-instance Generic Offer
 instance RobonomicsMsg Offer where
     hash = offerHash
 
@@ -210,20 +203,21 @@ instance ToJSON Offer where
         ]
 
 instance AbiType Offer where
-    isDynamic _ = False
+    isDynamic = const False
 
 instance AbiPut Offer where
-    abiPut Offer{..} = do
-        abiPut offerModel
-        abiPut offerObjective
-        abiPut offerToken
-        abiPut offerCost
-        abiPut offerValidator
-        abiPut offerLighthouse
-        abiPut offerLighthouseFee
-        abiPut offerDeadline
-        abiPut offerSender
-        abiPut offerSignature
+    abiPut Offer{..} = abiPut
+        ( toBytes offerModel
+        , toBytes offerObjective
+        , offerToken
+        , offerCost
+        , offerValidator
+        , offerLighthouse
+        , offerLighthouseFee
+        , offerDeadline
+        , offerSender
+        , offerSignature
+        )
 
 instance Hashable Offer where
     hashWithSalt = flip (flip hashWithSalt . bs . offerHash)
