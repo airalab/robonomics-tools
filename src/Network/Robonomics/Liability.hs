@@ -8,6 +8,7 @@ import           Data.Base58String.Bitcoin              (Base58String,
                                                          fromBytes, toBytes,
                                                          toText)
 import           Data.ByteArray                         (convert)
+import qualified Data.ByteArray.HexString               as HS (toBytes)
 import qualified Data.ByteString.Char8                  as C8
 import           Data.Default                           (def)
 import           Data.Proxy                             (Proxy (..))
@@ -119,6 +120,6 @@ finalize :: (JsonRpc m, Unit gasPrice)
 finalize lighthouse price Report{..} =
     withParam (to .~ lighthouse) $
         withParam (gasPrice .~ price) $
-            Lighthouse.finalizeLiability reportLiability resultBytes reportSuccess reportSignature
+            Lighthouse.finalizeLiability reportLiability resultBytes reportSuccess (HS.toBytes reportSignature)
   where
     resultBytes = convert (toBytes reportResult)

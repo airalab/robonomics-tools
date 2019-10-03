@@ -36,9 +36,11 @@ instance ToJSON Msg where
 
 parseMsg :: Value -> Either String Msg
 parseMsg = parseEither $
-    \msg -> MkDemand <$> parseJSON msg
-        <|> MkOffer  <$> parseJSON msg
-        <|> MkReport <$> parseJSON msg
+    \msg -> MkDemand   <$> parseJSON msg
+        <|> MkOffer    <$> parseJSON msg
+        <|> MkReport   <$> parseJSON msg
+        <|> MkAccepted <$> parseJSON msg
+        <|> MkPending  <$> parseJSON msg
 
 subscribe :: (MonadIO m, MonadLogger m)
           => String

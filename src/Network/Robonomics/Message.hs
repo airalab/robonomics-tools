@@ -22,10 +22,11 @@ import qualified Crypto.Hash               as Crypto
 import           Data.Aeson                (FromJSON (..), ToJSON (..), object,
                                             withObject, (.:), (.=))
 import           Data.Base58String.Bitcoin (Base58String, toBytes)
-import           Data.ByteArray            (ByteArrayAccess)
+import           Data.ByteArray            (ByteArray, ByteArrayAccess)
 import qualified Data.ByteArray            as BA (convert, drop)
 import           Data.ByteArray.Encoding   (Base (Base16), convertFromBase)
-import           Data.ByteArray.HexString  (HexString, fromBytes)
+import           Data.ByteArray.HexString  (HexString)
+import qualified Data.ByteArray.HexString  as HS (toBytes)
 import           Data.ByteArray.Sized      (unsafeSizedByteArray)
 import           Data.ByteString           (ByteString)
 import qualified Data.ByteString.Char8     as C8 (concat, cons, pack, unpack)
@@ -51,7 +52,7 @@ instance (KnownNat n, n <= 256) => ToJSON (UIntN n) where
 class RobonomicsMsg a where
     hash :: a -> Digest Keccak_256
 
-    sign :: PrivateKey -> a -> Bytes
+    sign :: ByteArray ba => PrivateKey -> a -> ba
     {-# INLINE sign #-}
     sign key = signMessage key . hash
 
@@ -66,24 +67,24 @@ data Demand = Demand
     , demandDeadline     :: !(UIntN 256)
     , demandNonce        :: !(UIntN 256)
     , demandSender       :: !Address
-    , demandSignature    :: !Bytes
+    , demandSignature    :: !HexString
     }
   deriving Eq
 
 instance Show Demand where
     show Demand{..} =
-        C8.unpack $ C8.concat $ C8.cons ' ' <$>
-            [ C8.pack (show demandModel)
-            , C8.pack (show demandObjective)
-            , C8.pack (show demandToken)
-            , C8.pack (show demandCost)
-            , C8.pack (show demandLighthouse)
-            , C8.pack (show demandValidator)
-            , C8.pack (show demandValidatorFee)
-            , C8.pack (show demandDeadline)
-            , C8.pack (show demandNonce)
-            , C8.pack (show demandSender)
-            , C8.pack (show (BA.convert demandSignature :: HexString))
+        C8.unpack $ C8.concat $ C8.cons ' ' . C8.pack <$>
+            [ show demandModel
+            , show demandObjective
+            , show demandToken
+            , show demandCost
+            , show demandLighthouse
+            , show demandValidator
+            , show demandValidatorFee
+            , show demandDeadline
+            , show demandNonce
+            , show demandSender
+            , show demandSignature
             ]
 
 instance RobonomicsMsg Demand where
@@ -101,21 +102,21 @@ instance FromJSON Demand where
         <*> v .: "deadline"
         <*> v .: "nonce"
         <*> v .: "sender"
-        <*> (b16decode =<< v .: "signature")
+        <*> v .: "signature"
 
 instance ToJSON Demand where
     toJSON Demand{..} = object
-        [ "model" .= demandModel
-        , "objective" .= demandObjective
-        , "token" .= demandToken
-        , "cost" .= demandCost
-        , "lighthouse" .= demandLighthouse
-        , "validator" .= demandValidator
+        [ "model"        .= demandModel
+        , "objective"    .= demandObjective
+        , "token"        .= demandToken
+        , "cost"         .= demandCost
+        , "lighthouse"   .= demandLighthouse
+        , "validator"    .= demandValidator
         , "validatorFee" .= demandValidatorFee
-        , "deadline" .= demandDeadline
-        , "nonce" .= demandNonce
-        , "sender" .= demandSender
-        , "signature" .= (BA.convert demandSignature :: HexString)
+        , "deadline"     .= demandDeadline
+        , "nonce"        .= demandNonce
+        , "sender"       .= demandSender
+        , "signature"    .= demandSignature
         ]
 
 instance AbiType Demand where
@@ -132,7 +133,7 @@ instance AbiPut Demand where
         , demandValidatorFee
         , demandDeadline
         , demandSender
-        , demandSignature
+        , (HS.toBytes demandSignature :: Bytes)
         )
 
 instance Hashable Demand where
@@ -150,24 +151,24 @@ data Offer = Offer
     , offerDeadline      :: !(UIntN 256)
     , offerNonce         :: !(UIntN 256)
     , offerSender        :: !Address
-    , offerSignature     :: !Bytes
+    , offerSignature     :: !HexString
     }
   deriving Eq
 
 instance Show Offer where
     show Offer{..} =
-        C8.unpack $ C8.concat $ C8.cons ' ' <$>
-            [ C8.pack (show offerModel)
-            , C8.pack (show offerObjective)
-            , C8.pack (show offerToken)
-            , C8.pack (show offerCost)
-            , C8.pack (show offerValidator)
-            , C8.pack (show offerLighthouse)
-            , C8.pack (show offerLighthouseFee)
-            , C8.pack (show offerDeadline)
-            , C8.pack (show offerNonce)
-            , C8.pack (show offerSender)
-            , C8.pack (show (BA.convert offerSignature :: HexString))
+        C8.unpack $ C8.concat $ C8.cons ' ' . C8.pack <$>
+            [ show offerModel
+            , show offerObjective
+            , show offerToken
+            , show offerCost
+            , show offerValidator
+            , show offerLighthouse
+            , show offerLighthouseFee
+            , show offerDeadline
+            , show offerNonce
+            , show offerSender
+            , show offerSignature
             ]
 
 instance RobonomicsMsg Offer where
@@ -185,21 +186,21 @@ instance FromJSON Offer where
         <*> v .: "deadline"
         <*> v .: "nonce"
         <*> v .: "sender"
-        <*> (b16decode =<< v .: "signature")
+        <*> v .: "signature"
 
 instance ToJSON Offer where
     toJSON Offer{..} = object
-        [ "model" .= offerModel
-        , "objective" .= offerObjective
-        , "token" .= offerToken
-        , "cost" .= offerCost
-        , "validator" .= offerValidator
-        , "lighthouse" .= offerLighthouse
+        [ "model"         .= offerModel
+        , "objective"     .= offerObjective
+        , "token"         .= offerToken
+        , "cost"          .= offerCost
+        , "validator"     .= offerValidator
+        , "lighthouse"    .= offerLighthouse
         , "lighthouseFee" .= offerLighthouseFee
-        , "deadline" .= offerDeadline
-        , "nonce" .= offerNonce
-        , "sender" .= offerSender
-        , "signature" .= (BA.convert offerSignature :: HexString)
+        , "deadline"      .= offerDeadline
+        , "nonce"         .= offerNonce
+        , "sender"        .= offerSender
+        , "signature"     .= offerSignature
         ]
 
 instance AbiType Offer where
@@ -216,7 +217,7 @@ instance AbiPut Offer where
         , offerLighthouseFee
         , offerDeadline
         , offerSender
-        , offerSignature
+        , (HS.toBytes offerSignature :: Bytes)
         )
 
 instance Hashable Offer where
@@ -227,7 +228,7 @@ data Report = Report
   { reportLiability :: !Address
   , reportResult    :: !Base58String
   , reportSuccess   :: !Bool
-  , reportSignature :: !Bytes
+  , reportSignature :: !HexString
   } deriving (Eq, GHC.Generic)
 
 instance Show Report where
@@ -236,7 +237,7 @@ instance Show Report where
             [ C8.pack (show reportLiability)
             , C8.pack (show reportResult)
             , C8.pack (show reportSuccess)
-            , C8.pack (show (BA.convert reportSignature :: HexString))
+            , C8.pack (show reportSignature)
             ]
 
 instance Generic Report
@@ -248,14 +249,14 @@ instance FromJSON Report where
         <$> v .: "liability"
         <*> v .: "result"
         <*> v .: "success"
-        <*> (b16decode =<< v .: "signature")
+        <*> v .: "signature"
 
 instance ToJSON Report where
     toJSON Report{..} = object
         [ "liability" .= reportLiability
         , "result" .= reportResult
         , "success" .= reportSuccess
-        , "signature" .= (BA.convert reportSignature :: HexString)
+        , "signature" .= reportSignature
         ]
 
 instance Hashable Report where
@@ -263,9 +264,9 @@ instance Hashable Report where
       where bs = BA.convert :: ByteArrayAccess ba => ba -> ByteString
 
 data Accepted = Accepted
-  { acceptedOrderHash :: !Bytes
+  { acceptedOrderHash :: !HexString
   , acceptedTime      :: !(UIntN 256)
-  , acceptedSignature :: !Bytes
+  , acceptedSignature :: !HexString
   } deriving (Eq, GHC.Generic)
 
 instance Show Accepted where
@@ -273,7 +274,7 @@ instance Show Accepted where
         C8.unpack $ C8.concat $ C8.cons ' ' <$>
             [ C8.pack (show acceptedOrderHash)
             , C8.pack (show acceptedTime)
-            , C8.pack (show (BA.convert acceptedSignature :: HexString))
+            , C8.pack (show acceptedSignature)
             ]
 
 instance Generic Accepted
@@ -284,13 +285,13 @@ instance FromJSON Accepted where
     parseJSON = withObject "Accepted" $ \v -> Accepted
         <$> v .: "order"
         <*> v .: "accepted"
-        <*> (b16decode =<< v .: "signature")
+        <*> v .: "signature"
 
 instance ToJSON Accepted where
     toJSON Accepted{..} = object
         [ "order" .= acceptedOrderHash
         , "accepted" .= acceptedTime
-        , "signature" .= (BA.convert acceptedSignature :: HexString)
+        , "signature" .= acceptedSignature
         ]
 
 instance Hashable Accepted where
@@ -298,20 +299,20 @@ instance Hashable Accepted where
       where bs = BA.convert :: ByteArrayAccess ba => ba -> ByteString
 
 newtype Pending = Pending
-  { pendingTransaction :: Bytes
+  { pendingTransaction :: HexString
   } deriving(Eq, GHC.Generic)
 
 instance Show Pending where
-    show Pending{..} = show (BA.convert pendingTransaction :: HexString)
+    show = show . pendingTransaction
 
 instance Generic Pending
 instance FromJSON Pending where
     parseJSON = withObject "Pending" $ \v -> Pending
-        <$> (b16decode =<< v .: "tx")
+        <$> v .: "tx"
 
 instance ToJSON Pending where
     toJSON Pending{..} = object
-        [ "tx" .= (BA.convert pendingTransaction :: HexString) ]
+        [ "tx" .= pendingTransaction ]
 
 instance Hashable Pending where
     hashWithSalt = flip (flip hashWithSalt . bs . pendingHash)
@@ -360,7 +361,4 @@ acceptedHash Accepted{..} =
 
 pendingHash :: Pending -> Digest Keccak_256
 {-# INLINE pendingHash #-}
-pendingHash Pending{..} = Crypto.hash pendingTransaction
-
-b16decode :: Monad m => Text -> m Bytes
-b16decode = either fail return . convertFromBase Base16 . encodeUtf8
+pendingHash = Crypto.hash . pendingTransaction
