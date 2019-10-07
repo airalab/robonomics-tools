@@ -45,8 +45,7 @@ import           Lens.Micro                                  ((.~))
 import           Network.Ethereum.Account                    (LocalKey (..),
                                                               LocalKeyAccount)
 import qualified Network.Ethereum.Api.Eth                    as Eth
-import           Network.Ethereum.Api.Provider               (Provider,
-                                                              Web3Error,
+import           Network.Ethereum.Api.Provider               (Provider, Web3Error (UserFail),
                                                               forkWeb3,
                                                               runWeb3')
 import           Network.Ethereum.Api.Types                  (DefaultBlock (Latest),
@@ -169,7 +168,7 @@ local cfg@Config{..} =
 
                     price <- oracleGasPrice gasprice
                     $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
-                    let runSafe = flip catchAll (const (return $ Left undefined) <=< $logError . T.pack . show)
+                    let runSafe = flip catchAll (const (return $ Left $ UserFail "Exception catched") <=< $logError . T.pack . show)
                         web3 = runWeb3' web3Provider . withAccount web3Account
                         create = runSafe . web3 . Liability.create lighthouseAddress price
 
@@ -181,7 +180,7 @@ local cfg@Config{..} =
 
                     price <- oracleGasPrice gasprice
                     $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
-                    let runSafe = flip catchAll (const (return $ Left undefined) <=< $logError . T.pack . show)
+                    let runSafe = flip catchAll (const (return $ Left $ UserFail "Exception catched") <=< $logError . T.pack . show)
                         web3 = runWeb3' web3Provider . withAccount web3Account
                         finalize = runSafe . web3 . Liability.finalize lighthouseAddress price
 
@@ -201,7 +200,7 @@ ipfs cfg@Config{..} =
         $logInfo $ "Gas price: " <> T.pack (show gasprice)
 
         let web3 = runWeb3' web3Provider . withAccount web3Account
-            runSafe = flip catchAll (const (return $ Left undefined) <=< $logError . T.pack . show)
+            runSafe = flip catchAll (const (return $ Left $ UserFail "Exception catched") <=< $logError . T.pack . show)
 
             dispatcher = forever $ do
                 msg <- await
