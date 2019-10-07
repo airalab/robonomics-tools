@@ -1,5 +1,5 @@
 name:                robonomics-tools
-version:             0.5.5.0
+version:             0.6.0.0
 github:              "airalab/robonomics-tools"
 license:             BSD3
 author:              "Alexander Krupenkin"
@@ -22,6 +22,7 @@ description:         Please see the README on GitHub at <https://github.com/aira
 dependencies:
 - base >= 4.7 && < 5
 - optparse-applicative
+- unordered-containers
 - monad-control 
 - base58string
 - monad-logger
@@ -30,7 +31,6 @@ dependencies:
 - http-conduit 
 - bytestring
 - cryptonite
-- containers
 - exceptions
 - microlens
 - hashable
@@ -39,6 +39,7 @@ dependencies:
 - aeson
 - async
 - pipes
+- heap
 - text
 - web3
 - mtl
