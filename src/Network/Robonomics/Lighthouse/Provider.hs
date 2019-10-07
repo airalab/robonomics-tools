@@ -7,80 +7,81 @@
 {-# LANGUAGE TemplateHaskell   #-}
 module Network.Robonomics.Lighthouse.Provider where
 
-import           Control.Concurrent                          (newChan, readChan,
-                                                              threadDelay,
-                                                              writeChan)
-import           Control.Concurrent.Async                    (async)
-import           Control.Monad                               (forever, void,
-                                                              when, (<=<))
-import           Control.Monad.Catch                         (MonadCatch,
-                                                              catchAll)
-import           Control.Monad.Fail                          (MonadFail)
-import           Control.Monad.IO.Class                      (MonadIO (..))
-import           Control.Monad.Logger                        (LoggingT,
-                                                              MonadLogger,
-                                                              logDebug,
-                                                              logError, logInfo,
-                                                              runChanLoggingT,
-                                                              runStderrLoggingT,
-                                                              unChanLoggingT)
-import           Control.Monad.Reader                        (ReaderT)
-import           Control.Monad.Trans                         (lift)
-import           Control.Monad.Trans.Control                 (MonadBaseControl)
-import           Crypto.Ethereum                             (PrivateKey)
-import           Crypto.Ethereum.Utils                       (derivePubKey)
-import           Crypto.Random                               (MonadRandom (..))
-import           Data.Aeson                                  (FromJSON (..),
-                                                              withObject, (.:))
-import qualified Data.ByteArray                              as BA (convert)
-import           Data.ByteArray.HexString                    (HexString)
-import           Data.ByteString                             (ByteString)
-import qualified Data.ByteString.Char8                       as C8 (pack)
-import           Data.Default                                (def)
-import           Data.Maybe                                  (fromJust)
-import           Data.Solidity.Abi.Codec                     (decode, encode)
-import           Data.Solidity.Prim.Address                  (fromPubKey)
-import qualified Data.Text                                   as T
-import           Lens.Micro                                  ((.~))
-import           Network.Ethereum.Account                    (LocalKey (..),
-                                                              LocalKeyAccount)
-import qualified Network.Ethereum.Api.Eth                    as Eth
-import           Network.Ethereum.Api.Provider               (Provider, Web3Error (UserFail),
-                                                              forkWeb3,
-                                                              runWeb3')
-import           Network.Ethereum.Api.Types                  (DefaultBlock (Latest),
-                                                              Filter (..),
-                                                              changeTopics,
-                                                              receiptLogs,
-                                                              receiptTransactionHash)
-import           Network.Ethereum.Ens                        (namehash)
-import qualified Network.Ethereum.Ens.PublicResolver         as Resolver
-import qualified Network.Ethereum.Ens.Registry               as Reg
+import           Control.Concurrent                         (newChan, readChan,
+                                                             threadDelay,
+                                                             writeChan)
+import           Control.Concurrent.Async                   (async)
+import           Control.Monad                              (forever, void,
+                                                             when, (<=<))
+import           Control.Monad.Catch                        (MonadCatch,
+                                                             catchAll)
+import           Control.Monad.Fail                         (MonadFail)
+import           Control.Monad.IO.Class                     (MonadIO (..))
+import           Control.Monad.Logger                       (LoggingT,
+                                                             MonadLogger,
+                                                             logDebug, logError,
+                                                             logInfo,
+                                                             runChanLoggingT,
+                                                             runStderrLoggingT,
+                                                             unChanLoggingT)
+import           Control.Monad.Reader                       (ReaderT)
+import           Control.Monad.State                        (MonadState)
+import           Control.Monad.Trans                        (lift)
+import           Control.Monad.Trans.Control                (MonadBaseControl)
+import           Crypto.Ethereum                            (PrivateKey)
+import           Crypto.Ethereum.Utils                      (derivePubKey)
+import           Crypto.Random                              (MonadRandom (..))
+import           Data.Aeson                                 (FromJSON (..),
+                                                             withObject, (.:))
+import qualified Data.ByteArray                             as BA (convert)
+import           Data.ByteArray.HexString                   (HexString)
+import           Data.ByteString                            (ByteString)
+import qualified Data.ByteString.Char8                      as C8 (pack)
+import           Data.Default                               (def)
+import           Data.Maybe                                 (fromJust)
+import           Data.Solidity.Abi.Codec                    (decode, encode)
+import           Data.Solidity.Prim.Address                 (fromPubKey)
+import qualified Data.Text                                  as T
+import           Lens.Micro                                 ((.~))
+import           Network.Ethereum.Account                   (LocalKey (..),
+                                                             LocalKeyAccount)
+import qualified Network.Ethereum.Api.Eth                   as Eth
+import           Network.Ethereum.Api.Provider              (Provider, Web3Error (UserFail),
+                                                             forkWeb3, runWeb3')
+import           Network.Ethereum.Api.Types                 (DefaultBlock (Latest),
+                                                             Filter (..),
+                                                             changeTopics,
+                                                             receiptLogs,
+                                                             receiptTransactionHash)
+import           Network.Ethereum.Ens                       (namehash)
+import qualified Network.Ethereum.Ens.PublicResolver        as Resolver
+import qualified Network.Ethereum.Ens.Registry              as Reg
 import           Network.Ethereum.Web3
-import           Network.HTTP.Simple                         (getResponseBody,
-                                                              httpJSON)
-import           Network.JsonRpc.TinyClient                  (JsonRpc)
-import           Pipes                                       (await, for,
-                                                              runEffect, yield,
-                                                              (>->))
+import           Network.HTTP.Simple                        (getResponseBody,
+                                                             httpJSON)
+import           Network.JsonRpc.TinyClient                 (JsonRpc)
+import           Pipes                                      (await, for,
+                                                             runEffect, yield,
+                                                             (>->))
 
-import qualified Network.Robonomics.Contract.Factory         as Factory
-import qualified Network.Robonomics.Contract.Lighthouse      as Lighthouse
-import qualified Network.Robonomics.Contract.XRT             as XRT
-import           Network.Robonomics.InfoChan                 (Msg (..), publish,
-                                                              subscribe)
-import           Network.Robonomics.Liability                (Liability (..))
-import qualified Network.Robonomics.Liability                as Liability (create,
-                                                                           finalize,
-                                                                           list,
-                                                                           read)
-import           Network.Robonomics.Liability.Generator      (randomDeal,
-                                                              randomReport)
-import           Network.Robonomics.Lighthouse.SimpleMatcher (matcher)
-import           Network.Robonomics.Message                  (Accepted (..),
-                                                              Pending (..),
-                                                              Report (..),
-                                                              RobonomicsMsg (..))
+import qualified Network.Robonomics.Contract.Factory        as Factory
+import qualified Network.Robonomics.Contract.Lighthouse     as Lighthouse
+import qualified Network.Robonomics.Contract.XRT            as XRT
+import           Network.Robonomics.InfoChan                (Msg (..), publish,
+                                                             subscribe)
+import           Network.Robonomics.Liability               (Liability (..))
+import qualified Network.Robonomics.Liability               as Liability (create,
+                                                                          finalize,
+                                                                          list,
+                                                                          read)
+import           Network.Robonomics.Liability.Generator     (randomDeal,
+                                                             randomReport)
+import           Network.Robonomics.Lighthouse.Matcher      (matcher)
+import           Network.Robonomics.Lighthouse.MatcherStore (MatcherStore)
+import           Network.Robonomics.Message                 (Accepted (..),
+                                                             Pending (..),
+                                                             Report (..),
+                                                             RobonomicsMsg (..))
 
 instance MonadRandom (LoggingT (ReaderT r Web3)) where
     getRandomBytes = liftIO . getRandomBytes
@@ -187,6 +188,7 @@ local cfg@Config{..} =
                     finalize report
 
 ipfs :: ( MonadBaseControl IO m
+        , MonadState MatcherStore m
         , MonadIO m
         , MonadLogger m
         , MonadCatch m

@@ -1,5 +1,16 @@
 # Changelog for robonomics-tools
 
+## [0.6.0.0] 2019-10-07
+### Added
+- New fee priority based order matcher
+
+### Changed
+- Transaction sending crash bug fix
+
+## [0.5.5.0] 2019-10-03
+### Changed 
+- Fixed Accepted/Pending message parsers 
+
 ## [0.5.4.0] 2019-09-24
 ### Added
 - EthGasStation support in gasprice parameter
