@@ -1,0 +1,57 @@
+= Troubleshooting
+:Author: Robonomics developers
+:Revision: 0.1.0
+:toc:
+:sectnums:
+
+== The transaction has been _pending_ for a long time
+
+Most likely the gas price is too low.
+
+The provider has a `--gasprice` option which allows you to manually control the gas price. To check the current acceptable gas price out go to https://etherscan.io/gasTracker[GasTracker].
+
+Starting from 0.5.4 it's possible to specify the `--gasprice` option as `safe`, `fast`, `fastest`.
+
+== IPFS messages don't reach the provider
+
+First of all, connnect to the same IPFS peers on the provider' and agent' side
+
+[source, bash]
+----
+ipfs swarm connect /dnsaddr/bootstrap.aira.life
+----
+
+Secondly, when the provider receives a message it replies with a service message. You can check them out via the following ROS topics:
+
+* `/liability/infochan/incoming/feedback/added_order` - when a Demand or an Offer message is received
+* `/liability/infochan/incoming/feedback/added_pending_transaction` - when there is a match and a transaction is broadcasted
+
+== Feedback messages
+
+When a demand or an offer is accepted the `/liability/infochan/incoming/feedback/added_order` topic sends a message
+
+[source, json]
+----
+{
+    "order": "0x...",
+    "accepted": 0,
+    "signature": "0x..."
+}
+----
+
+When there is a match the hash of the transaction is sent via the `/liability/infochan/incoming/feedback/added_pending_transaction` topic
+
+[source, json]
+----
+{
+    "tx": "0x..."
+}
+----
+
+== The problem is not described here
+
+If any other issue is occured, please fill in an issua on this https://github.com/airalab/robonomics-tools/issues[page]
+
+It's highly recomended to give all the information about the issue: what you have done, what you expected and what you have got
+
+
