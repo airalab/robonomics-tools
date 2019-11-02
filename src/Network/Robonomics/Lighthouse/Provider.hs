@@ -169,19 +169,23 @@ local cfg@Config{..} =
 
                     price <- oracleGasPrice gasprice
                     $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
-                    let runSafe = flip catchAll (const (return $ Left $ UserFail "Exception catched") <=< $logError . T.pack . show)
+                    let runSafe = flip catchAll (const (return $ Left $ UserFail "Create exception catched") <=< $logError . T.pack . show)
                         web3 = runWeb3' web3Provider . withAccount web3Account
                         create = runSafe . web3 . Liability.create lighthouseAddress price
 
                     deal <- randomDeal lighthouseAddress nonce key
                     Right receipt <- create deal
-                    let Right liabilityAddress = decode (changeTopics (receiptLogs receipt !! 2) !! 1)
+                    let newLiabilityLog = "0xf0f0e2354315aae25080baa26761b4ef52d621c91208fb0edde9e3f3fade3219" :: HexString
+                        logs = dropWhile ((/= newLiabilityLog) . head) (changeTopics <$> receiptLogs receipt)
+                        Right liabilityAddress = decode (head logs !! 1)
+
+                    liftIO $ threadDelay 30000000
 
                     report <- randomReport liabilityAddress key
 
                     price <- oracleGasPrice gasprice
                     $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
-                    let runSafe = flip catchAll (const (return $ Left $ UserFail "Exception catched") <=< $logError . T.pack . show)
+                    let runSafe = flip catchAll (const (return $ Left $ UserFail "Finalize exception catched") <=< $logError . T.pack . show)
                         web3 = runWeb3' web3Provider . withAccount web3Account
                         finalize = runSafe . web3 . Liability.finalize lighthouseAddress price
 
@@ -203,7 +207,6 @@ ipfs cfg@Config{..} =
 
         let web3 = runWeb3' web3Provider . withAccount web3Account
             runSafe = flip catchAll (const (return $ Left $ UserFail "Exception catched") <=< $logError . T.pack . show)
-
             dispatcher = forever $ do
                 msg <- await
                 case msg of
@@ -211,8 +214,8 @@ ipfs cfg@Config{..} =
 
                         price <- oracleGasPrice gasprice
                         lift $ $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
-                        let create   = lift . runSafe . web3 . Liability.create lighthouseAddress price
 
+                        let create = lift . runSafe . web3 . Liability.create lighthouseAddress price
                         res <- create deal
                         case res of
                             Right receipt -> do
@@ -223,8 +226,8 @@ ipfs cfg@Config{..} =
                     Left (MkReport report) -> do
                         price <- oracleGasPrice gasprice
                         lift $ $logInfo $ "Using gasPrice: " <> T.pack (show (price :: Shannon))
-                        let finalize = lift . runSafe . web3 . Liability.finalize lighthouseAddress price
 
+                        let finalize = lift . runSafe . web3 . Liability.finalize lighthouseAddress price
                         res <- finalize report
                         case res of
                             Right receipt -> do
