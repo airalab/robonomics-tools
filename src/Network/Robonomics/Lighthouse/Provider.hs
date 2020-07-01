@@ -29,7 +29,7 @@ import           Control.Monad.State                        (MonadState)
 import           Control.Monad.Trans                        (lift)
 import           Control.Monad.Trans.Control                (MonadBaseControl)
 import           Crypto.Ethereum                            (PrivateKey)
-import           Crypto.Ethereum.Utils                      (derivePubKey)
+import           Crypto.Ecdsa.Utils                      (derivePubKey)
 import           Crypto.Random                              (MonadRandom (..))
 import           Data.Aeson                                 (FromJSON (..),
                                                              withObject, (.:))
@@ -46,7 +46,7 @@ import           Lens.Micro                                 ((.~))
 import           Network.Ethereum.Account                   (LocalKey (..),
                                                              LocalKeyAccount)
 import qualified Network.Ethereum.Api.Eth                   as Eth
-import           Network.Ethereum.Api.Provider              (Provider, Web3Error (UserFail),
+import           Network.Web3.Provider              (Provider, Web3Error (UserFail),
                                                              forkWeb3, runWeb3')
 import           Network.Ethereum.Api.Types                 (DefaultBlock (Latest),
                                                              Filter (..),
@@ -56,7 +56,8 @@ import           Network.Ethereum.Api.Types                 (DefaultBlock (Lates
 import           Network.Ethereum.Ens                       (namehash)
 import qualified Network.Ethereum.Ens.PublicResolver        as Resolver
 import qualified Network.Ethereum.Ens.Registry              as Reg
-import           Network.Ethereum.Web3
+import           Network.Ethereum
+import           Network.Web3
 import           Network.HTTP.Simple                        (getResponseBody,
                                                              httpJSON)
 import           Network.JsonRpc.TinyClient                 (JsonRpc)

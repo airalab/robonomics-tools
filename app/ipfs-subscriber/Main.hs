@@ -16,10 +16,10 @@ import           Control.Monad.Trans                    (lift)
 import qualified Data.ByteString.Char8                  as C8
 import           Data.Default                           (Default (..))
 import qualified Data.Text                              as T (pack, unpack)
-import           Network.Ethereum.Api.Provider          (runWeb3')
+import           Network.Web3.Provider          (runWeb3')
 import           Network.Ethereum.Api.Types             (DefaultBlock (..),
                                                          Filter (..))
-import           Network.Ethereum.Web3
+import           Network.Ethereum
 import           Options.Applicative
 import           Pipes                                  (for, runEffect)
 import           System.Exit                            (exitFailure)

@@ -2,10 +2,10 @@
 module Options where
 
 import           Crypto.Ethereum                        (PrivateKey)
-import           Crypto.Ethereum.Utils                  (importKey)
+import           Crypto.Ecdsa.Utils                     (importKey)
 import           Data.ByteArray.HexString               (HexString)
 import           Network.Ethereum.Account.LocalKey      (LocalKey (..))
-import           Network.Ethereum.Api.Provider          (Provider (..))
+import           Network.Web3.Provider          (Provider (..))
 import           Network.Ethereum.Chain
 import           Network.Ethereum.Unit                  (Shannon, fromWei)
 import           Options.Applicative

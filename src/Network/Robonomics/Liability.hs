@@ -19,9 +19,10 @@ import           Network.Ethereum.Api.Types             (DefaultBlock,
                                                          Filter (..), Quantity,
                                                          changeBlockNumber)
 import           Network.Ethereum.Api.Types             (TxReceipt)
-import           Network.Ethereum.Contract.Event        (event')
+import           Network.Ethereum.Contract.Event        (event)
 import           Network.Ethereum.Contract.Method       (selector)
-import           Network.Ethereum.Web3
+import           Network.Ethereum
+import           Network.Web3
 import           Network.JsonRpc.TinyClient             (JsonRpc)
 
 import qualified Network.Robonomics.Contract.Factory    as F
@@ -86,7 +87,7 @@ list factory from to f = do
             , filterFromBlock = from
             , filterToBlock   = to
             }
-    event' flt $ \(F.NewLiability a) -> do
+    event flt $ \(F.NewLiability a) -> do
         mbbn <- asks changeBlockNumber
         case mbbn of
             Just bn -> lift $ f bn a
