@@ -3,8 +3,8 @@ module Main where
 
 import           Control.Monad.IO.Class        (liftIO)
 import           Data.Default                  (def)
-import           Network.Ethereum.Api.Provider
-import           Network.Ethereum.Web3
+import           Network.Web3.Provider
+import           Network.Ethereum
 import           Options.Applicative
 import           System.Exit
 

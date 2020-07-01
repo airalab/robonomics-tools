@@ -2,7 +2,7 @@
 module Options where
 
 import           Data.Solidity.Prim            (Address)
-import           Network.Ethereum.Api.Provider (Provider (..))
+import           Network.Web3.Provider (Provider (..))
 import           Network.Ethereum.Api.Types    (DefaultBlock (..))
 import           Options.Applicative
 

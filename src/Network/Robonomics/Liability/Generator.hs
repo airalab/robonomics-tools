@@ -32,12 +32,12 @@ import           Data.Solidity.Event                    (decodeEvent)
 import           Data.Solidity.Prim.Address             (fromPubKey)
 import qualified Data.Text                              as T
 import qualified Network.Ethereum.Api.Eth               as Eth
-import           Network.Ethereum.Api.Provider
+import           Network.Web3.Provider
 import           Network.Ethereum.Api.Types             (Change,
                                                          DefaultBlock (..),
                                                          Filter (..), Quantity,
                                                          TxReceipt (..))
-import           Network.Ethereum.Web3
+import           Network.Ethereum
 
 import qualified Network.Robonomics.Contract.Factory    as F
 import qualified Network.Robonomics.Contract.Lighthouse as L
