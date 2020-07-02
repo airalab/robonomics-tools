@@ -31,4 +31,4 @@ options = Options
     <*> option block (long "from-block" <> value (BlockWithNumber 7584512) <> help "Lighthouse scan start block")
 
 infura :: Provider
-infura = HttpProvider "https://mainnet.infura.io/v3/1ba07380f3e740148f89852159695c73"
+infura = HttpProvider "https://mainnet.infura.io/v3/5a51dee653a543d1887d6c2e318c405c"
